@@ -1,0 +1,187 @@
+import React, { useCallback } from 'react';
+import { Trash2, Palette } from 'lucide-react';
+import { NeonInput } from '@/components/ui/NeonInput';
+import { NeonButton } from '@/components/ui/NeonButton';
+import { TagEditor } from './TagEditor';
+import { useEvidenceStore } from '@/store/useEvidenceStore';
+import { useCanvasStore } from '@/store/useCanvasStore';
+import {
+  CYBERPUNK_COLORS,
+  getGlowColor,
+  IMPORTANCE_COLORS,
+} from '@/utils/colorUtils';
+import type { Evidence, ImportanceLevel } from '@/types';
+
+interface EvidenceEditorProps {
+  evidence: Evidence;
+}
+
+const importanceOptions: Array<{ value: ImportanceLevel; label: string }> = [
+  { value: 'low', label: '低' },
+  { value: 'normal', label: '中' },
+  { value: 'high', label: '高' },
+  { value: 'critical', label: '紧急' },
+];
+
+const colorOptions = [
+  CYBERPUNK_COLORS.accentCyan,
+  CYBERPUNK_COLORS.accentRed,
+  CYBERPUNK_COLORS.accentYellow,
+  CYBERPUNK_COLORS.accentGreen,
+  CYBERPUNK_COLORS.accentPurple,
+  '#ff6b6b',
+  '#4ecdc4',
+  '#45b7d1',
+];
+
+export const EvidenceEditor: React.FC<EvidenceEditorProps> = ({ evidence }) => {
+  const updateEvidence = useEvidenceStore((state) => state.updateEvidence);
+  const deleteEvidence = useEvidenceStore((state) => state.deleteEvidence);
+  const setSelectedId = useCanvasStore((state) => state.setSelectedId);
+
+  const handleFieldChange = useCallback(
+    (field: keyof Evidence, value: string | number | string[]) => {
+      updateEvidence(evidence.id, { [field]: value } as Partial<Evidence>);
+    },
+    [evidence.id, updateEvidence]
+  );
+
+  const handleTagsChange = useCallback(
+    (tags: string[]) => {
+      handleFieldChange('tags', tags);
+    },
+    [handleFieldChange]
+  );
+
+  const handleDelete = useCallback(async () => {
+    if (confirm('确定要删除此证据吗？')) {
+      await deleteEvidence(evidence.id);
+      setSelectedId(null);
+    }
+  }, [evidence.id, deleteEvidence, setSelectedId]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <NeonInput
+          label="内容"
+          value={evidence.content}
+          onChange={(e) => handleFieldChange('content', e.target.value)}
+        />
+      </div>
+
+      <div>
+        <NeonInput
+          label="来源"
+          value={evidence.source}
+          onChange={(e) => handleFieldChange('source', e.target.value)}
+          placeholder="证据来源..."
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label
+          className="block text-xs font-mono uppercase tracking-wider"
+          style={{ color: CYBERPUNK_COLORS.textSecondary }}
+        >
+          重要性
+        </label>
+        <div className="flex gap-2">
+          {importanceOptions.map((option) => {
+            const isActive = evidence.importance === option.value;
+            const color = IMPORTANCE_COLORS[option.value];
+            return (
+              <button
+                key={option.value}
+                className="flex-1 px-3 py-2 text-xs font-mono uppercase border rounded-sm transition-all"
+                style={{
+                  borderColor: isActive ? color : CYBERPUNK_COLORS.borderColor,
+                  color: isActive ? color : CYBERPUNK_COLORS.textSecondary,
+                  backgroundColor: isActive ? getGlowColor(color, 0.1) : 'transparent',
+                  boxShadow: isActive ? `0 0 10px ${getGlowColor(color, 0.4)}` : 'none',
+                }}
+                onClick={() => handleFieldChange('importance', option.value)}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label
+          className="block text-xs font-mono uppercase tracking-wider flex items-center gap-2"
+          style={{ color: CYBERPUNK_COLORS.textSecondary }}
+        >
+          <Palette size={14} />
+          卡片颜色
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {colorOptions.map((color) => (
+            <button
+              key={color}
+              className="w-8 h-8 rounded-sm border transition-all hover:scale-110"
+              style={{
+                backgroundColor: color,
+                borderColor: evidence.color === color ? color : CYBERPUNK_COLORS.borderColor,
+                boxShadow:
+                  evidence.color === color
+                    ? `0 0 15px ${getGlowColor(color, 0.8)}`
+                    : 'none',
+              }}
+              onClick={() => handleFieldChange('color', color)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <TagEditor tags={evidence.tags} onTagsChange={handleTagsChange} />
+
+      <div className="grid grid-cols-2 gap-2 pt-4 border-t" style={{ borderColor: CYBERPUNK_COLORS.borderColor }}>
+        <div>
+          <NeonInput
+            label="宽度"
+            type="number"
+            value={evidence.width}
+            onChange={(e) => handleFieldChange('width', parseInt(e.target.value) || 200)}
+            glowColor={CYBERPUNK_COLORS.accentYellow}
+          />
+        </div>
+        <div>
+          <NeonInput
+            label="高度"
+            type="number"
+            value={evidence.height}
+            onChange={(e) => handleFieldChange('height', parseInt(e.target.value) || 120)}
+            glowColor={CYBERPUNK_COLORS.accentYellow}
+          />
+        </div>
+      </div>
+
+      <div
+        className="text-xs font-mono p-2 rounded-sm border"
+        style={{
+          borderColor: CYBERPUNK_COLORS.borderColor,
+          color: CYBERPUNK_COLORS.textSecondary,
+          backgroundColor: CYBERPUNK_COLORS.bgTertiary,
+        }}
+      >
+        <div>ID: {evidence.id.slice(0, 16)}...</div>
+        <div>位置: ({evidence.positionX}, {evidence.positionY})</div>
+        <div>创建: {new Date(evidence.createdAt).toLocaleString('zh-CN')}</div>
+      </div>
+
+      <NeonButton
+        variant="danger"
+        icon={<Trash2 size={16} />}
+        onClick={handleDelete}
+        className="w-full"
+      >
+        删除证据
+      </NeonButton>
+    </div>
+  );
+};
+
+export default EvidenceEditor;

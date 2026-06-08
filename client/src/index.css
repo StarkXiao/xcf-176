@@ -1,0 +1,243 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-tertiary: #1a1a25;
+  --accent-cyan: #00f0ff;
+  --accent-red: #ff0055;
+  --accent-yellow: #ffcc00;
+  --accent-green: #00ff88;
+  --accent-purple: #9945ff;
+  --text-primary: #e0e0e0;
+  --text-secondary: #888899;
+  --border-color: #2a2a3a;
+  --grid-color: #1a1a2e;
+  --grid-line-color: #252538;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'JetBrains Mono', monospace;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: rgba(0, 240, 255, 0.3);
+  color: var(--text-primary);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+}
+
+@layer utilities {
+  .text-shadow-neon-cyan {
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.8), 0 0 16px rgba(0, 240, 255, 0.4);
+  }
+
+  .text-shadow-neon-red {
+    text-shadow: 0 0 8px rgba(255, 0, 85, 0.8), 0 0 16px rgba(255, 0, 85, 0.4);
+  }
+
+  .text-shadow-neon-yellow {
+    text-shadow: 0 0 8px rgba(255, 204, 0, 0.8), 0 0 16px rgba(255, 204, 0, 0.4);
+  }
+
+  .text-shadow-neon-green {
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.8), 0 0 16px rgba(0, 255, 136, 0.4);
+  }
+
+  .box-shadow-neon-cyan {
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.6), inset 0 0 5px rgba(0, 240, 255, 0.1);
+  }
+
+  .box-shadow-neon-red {
+    box-shadow: 0 0 10px rgba(255, 0, 85, 0.6), inset 0 0 5px rgba(255, 0, 85, 0.1);
+  }
+
+  .box-shadow-neon-yellow {
+    box-shadow: 0 0 10px rgba(255, 204, 0, 0.6), inset 0 0 5px rgba(255, 204, 0, 0.1);
+  }
+
+  .box-shadow-neon-green {
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.6), inset 0 0 5px rgba(0, 255, 136, 0.1);
+  }
+
+  .crt-effect {
+    animation: crt-flicker 0.15s infinite;
+  }
+
+  .glitch-effect {
+    animation: glitch 1s infinite;
+  }
+
+  .blink-cursor::after {
+    content: '_';
+    animation: blink 1s step-end infinite;
+  }
+}
+
+@keyframes crt-flicker {
+  0% {
+    opacity: 0.97;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.98;
+  }
+}
+
+@keyframes glitch {
+  0%, 90%, 100% {
+    transform: translate(0);
+  }
+  91% {
+    transform: translate(-2px, 1px);
+  }
+  92% {
+    transform: translate(2px, -1px);
+  }
+  93% {
+    transform: translate(-1px, 2px);
+  }
+  94% {
+    transform: translate(1px, -2px);
+  }
+  95% {
+    transform: translate(-2px, -1px);
+  }
+  96% {
+    transform: translate(2px, 1px);
+  }
+  97% {
+    transform: translate(-1px, -2px);
+  }
+  98% {
+    transform: translate(1px, 2px);
+  }
+  99% {
+    transform: translate(-2px, 1px);
+  }
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 20px currentColor);
+  }
+}
+
+@keyframes typing {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.typing-effect {
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typing 2s steps(40, end);
+}
+
+input, textarea {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+button {
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg-secondary);
+}
