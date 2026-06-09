@@ -47,8 +47,15 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
     const toLabel = toEv ? toEv.content.slice(0, 15) : '?';
 
     try {
-      await connectionApi.delete(connectionId);
-    } catch {}
+      const res = await connectionApi.delete(connectionId);
+      if (!res.success) {
+        alert(res.error || '删除关联失败');
+        return;
+      }
+    } catch (err) {
+      alert('删除关联失败，请检查网络连接');
+      return;
+    }
 
     recordAuditLog(
       'delete_connection',

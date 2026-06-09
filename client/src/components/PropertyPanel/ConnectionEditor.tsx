@@ -70,8 +70,15 @@ export const ConnectionEditor: React.FC<ConnectionEditorProps> = ({ connection }
     const toLabel = toEvidence ? toEvidence.content.slice(0, 15) : '?';
 
     try {
-      await connectionApi.delete(connection.id);
-    } catch {}
+      const res = await connectionApi.delete(connection.id);
+      if (!res.success) {
+        alert(res.error || '删除关联失败');
+        return;
+      }
+    } catch (err) {
+      alert('删除关联失败，请检查网络连接');
+      return;
+    }
 
     recordAuditLog(
       'delete_connection',
