@@ -14,16 +14,19 @@ interface CanvasState {
   panX: number;
   panY: number;
   selectedId: string | null;
+  selectedConnectionId: string | null;
   connections: Connection[];
   drawingConnection: DrawingConnection | null;
   isPanning: boolean;
   setZoom: (zoom: number) => void;
   setPan: (x: number, y: number) => void;
   setSelectedId: (id: string | null) => void;
+  setSelectedConnectionId: (id: string | null) => void;
   setConnections: (connections: Connection[]) => void;
   addConnection: (connection: Connection) => void;
   removeConnection: (id: string) => void;
   updateConnection: (connection: Connection) => void;
+  patchConnection: (id: string, patch: Partial<Connection>) => void;
   startDrawingConnection: (fromId: string, startX: number, startY: number) => void;
   updateDrawingConnection: (endX: number, endY: number) => void;
   endDrawingConnection: () => void;
@@ -39,6 +42,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   panX: 0,
   panY: 0,
   selectedId: null,
+  selectedConnectionId: null,
   connections: [],
   drawingConnection: null,
   isPanning: false,
@@ -50,7 +54,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   setPan: (x, y) => set({ panX: x, panY: y }),
 
-  setSelectedId: (id) => set({ selectedId: id }),
+  setSelectedId: (id) => set({ selectedId: id, selectedConnectionId: null }),
+
+  setSelectedConnectionId: (id) => set({ selectedConnectionId: id, selectedId: null }),
 
   setConnections: (connections) => set({ connections }),
 
@@ -61,6 +67,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   removeConnection: (id) => {
     set((state) => ({
       connections: state.connections.filter((c) => c.id !== id),
+      selectedConnectionId: state.selectedConnectionId === id ? null : state.selectedConnectionId,
     }));
   },
 
@@ -68,6 +75,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((state) => ({
       connections: state.connections.map((c) =>
         c.id === connection.id ? connection : c
+      ),
+    }));
+  },
+
+  patchConnection: (id, patch) => {
+    set((state) => ({
+      connections: state.connections.map((c) =>
+        c.id === id ? { ...c, ...patch } : c
       ),
     }));
   },

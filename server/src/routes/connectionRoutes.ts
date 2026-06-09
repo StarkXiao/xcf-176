@@ -7,6 +7,7 @@ export const connectionRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/case/:caseId', ConnectionController.getConnectionsByCaseId);
   fastify.get('/evidence/:evidenceId', ConnectionController.getConnectionsByEvidenceId);
   fastify.post('/', ConnectionController.createConnection);
+  fastify.put('/:id', ConnectionController.updateConnection);
   fastify.delete('/:id', ConnectionController.deleteConnection);
   fastify.delete('/case/:caseId', ConnectionController.deleteConnectionsByCaseId);
 };

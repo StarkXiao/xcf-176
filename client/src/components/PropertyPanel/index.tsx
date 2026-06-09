@@ -1,6 +1,7 @@
 import React from 'react';
 import { Settings, X } from 'lucide-react';
 import { EvidenceEditor } from './EvidenceEditor';
+import { ConnectionEditor } from './ConnectionEditor';
 import { useUiStore } from '@/store/useUiStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
@@ -10,9 +11,14 @@ export const PropertyPanel: React.FC = () => {
   const propertyPanelOpen = useUiStore((state) => state.propertyPanelOpen);
   const togglePropertyPanel = useUiStore((state) => state.togglePropertyPanel);
   const selectedId = useCanvasStore((state) => state.selectedId);
+  const selectedConnectionId = useCanvasStore((state) => state.selectedConnectionId);
+  const connections = useCanvasStore((state) => state.connections);
   const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
 
   const selectedEvidence = selectedId ? getEvidenceById(selectedId) : null;
+  const selectedConnection = selectedConnectionId
+    ? connections.find((c) => c.id === selectedConnectionId) ?? null
+    : null;
 
   if (!propertyPanelOpen) {
     return (
@@ -74,6 +80,8 @@ export const PropertyPanel: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4">
         {selectedEvidence ? (
           <EvidenceEditor evidence={selectedEvidence} />
+        ) : selectedConnection ? (
+          <ConnectionEditor connection={selectedConnection} />
         ) : (
           <div
             className="text-center py-12 font-mono text-sm"
@@ -84,7 +92,7 @@ export const PropertyPanel: React.FC = () => {
               className="mx-auto mb-4 opacity-30"
               style={{ color: CYBERPUNK_COLORS.textSecondary }}
             />
-            <p>选择一个证据卡片</p>
+            <p>选择证据卡片或关联线</p>
             <p className="text-xs mt-2">以编辑其属性</p>
           </div>
         )}

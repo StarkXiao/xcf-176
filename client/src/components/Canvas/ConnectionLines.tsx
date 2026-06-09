@@ -3,6 +3,7 @@ import { useCanvasStore } from '@/store/useCanvasStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { getNearestEdge, getLinePath, getLineMidpoint } from '@/utils/geometry';
 import { captureConnectionSnapshot, recordAuditLog } from '@/utils/auditHelper';
+import { connectionApi } from '@/api/connectionApi';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
 import type { Connection } from '@/types';
 
@@ -12,8 +13,11 @@ interface ConnectionLinesProps {
 
 export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
   const connections = useCanvasStore((state) => state.connections);
+  const selectedConnectionId = useCanvasStore((state) => state.selectedConnectionId);
   const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
   const removeConnection = useCanvasStore((state) => state.removeConnection);
+  const setSelectedConnectionId = useCanvasStore((state) => state.setSelectedConnectionId);
+  const setSelectedId = useCanvasStore((state) => state.setSelectedId);
 
   const getStrokeDasharray = (style: Connection['lineStyle']) => {
     switch (style) {
@@ -28,25 +32,32 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
 
   const handleConnectionClick = (e: React.MouseEvent, connectionId: string) => {
     e.stopPropagation();
-    if (e.detail === 2) {
-      const conn = connections.find((c) => c.id === connectionId);
-      if (conn) {
-        const snapshot = captureConnectionSnapshot(conn);
-        const fromEv = getEvidenceById(conn.fromEvidenceId);
-        const toEv = getEvidenceById(conn.toEvidenceId);
-        const fromLabel = fromEv ? fromEv.content.slice(0, 15) : '?';
-        const toLabel = toEv ? toEv.content.slice(0, 15) : '?';
+    setSelectedConnectionId(connectionId);
+  };
 
-        recordAuditLog(
-          'delete_connection',
-          'connection',
-          connectionId,
-          `删除关联: ${fromLabel} → ${toLabel}`,
-          snapshot
-        );
-      }
-      removeConnection(connectionId);
-    }
+  const handleConnectionDoubleClick = async (e: React.MouseEvent, connectionId: string) => {
+    e.stopPropagation();
+    const conn = connections.find((c) => c.id === connectionId);
+    if (!conn) return;
+
+    const snapshot = captureConnectionSnapshot(conn);
+    const fromEv = getEvidenceById(conn.fromEvidenceId);
+    const toEv = getEvidenceById(conn.toEvidenceId);
+    const fromLabel = fromEv ? fromEv.content.slice(0, 15) : '?';
+    const toLabel = toEv ? toEv.content.slice(0, 15) : '?';
+
+    try {
+      await connectionApi.delete(connectionId);
+    } catch {}
+
+    recordAuditLog(
+      'delete_connection',
+      'connection',
+      connectionId,
+      `删除关联: ${fromLabel} → ${toLabel}`,
+      snapshot
+    );
+    removeConnection(connectionId);
   };
 
   return (
@@ -71,9 +82,23 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
         const path = getLinePath(from, to, 60);
         const midpoint = getLineMidpoint(from, to);
         const color = connection.color || CYBERPUNK_COLORS.accentCyan;
+        const isSelected = selectedConnectionId === connection.id;
 
         return (
           <g key={connection.id} className="pointer-events-auto">
+            {isSelected && (
+              <path
+                d={path}
+                fill="none"
+                stroke={CYBERPUNK_COLORS.accentYellow}
+                strokeWidth={6 / zoom}
+                strokeDasharray="8,4"
+                style={{
+                  filter: `drop-shadow(0 0 8px ${getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.6)})`,
+                  opacity: 0.6,
+                }}
+              />
+            )}
             <path
               d={path}
               fill="none"
@@ -86,6 +111,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
                 cursor: 'pointer',
               }}
               onClick={(e) => handleConnectionClick(e, connection.id)}
+              onDoubleClick={(e) => handleConnectionDoubleClick(e, connection.id)}
             />
             <path
               d={path}
@@ -94,6 +120,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
               strokeWidth={20 / zoom}
               style={{ cursor: 'pointer' }}
               onClick={(e) => handleConnectionClick(e, connection.id)}
+              onDoubleClick={(e) => handleConnectionDoubleClick(e, connection.id)}
             />
 
             {connection.label && (

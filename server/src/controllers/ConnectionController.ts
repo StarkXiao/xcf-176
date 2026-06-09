@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { ConnectionService } from '../services/ConnectionService.js';
-import type { CreateConnectionDto, ApiResponse } from '@shared/types';
+import type { CreateConnectionDto, ApiResponse, Connection } from '@shared/types';
+import type { UpdateConnectionDto } from '../services/ConnectionService.js';
 
 interface ConnectionIdParams {
   Params: { id: string };
@@ -122,6 +123,34 @@ export const ConnectionController = {
         message: '连线创建成功',
       };
       return reply.status(201).send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async updateConnection(req: FastifyRequest<{ Params: { id: string }; Body: UpdateConnectionDto }>, reply: FastifyReply) {
+    try {
+      const { id } = req.params;
+      const updated = ConnectionService.updateConnection(id, req.body);
+
+      if (!updated) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: '连线不存在',
+        };
+        return reply.status(404).send(response);
+      }
+
+      const response: ApiResponse<Connection> = {
+        success: true,
+        data: updated,
+        message: '连线更新成功',
+      };
+      return reply.send(response);
     } catch (error) {
       const response: ApiResponse<null> = {
         success: false,

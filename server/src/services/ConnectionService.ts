@@ -1,6 +1,12 @@
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
 import type { Connection, CreateConnectionDto } from '@shared/types';
 
+export interface UpdateConnectionDto {
+  label?: string;
+  color?: string;
+  lineStyle?: Connection['lineStyle'];
+}
+
 export const ConnectionService = {
   getAllConnections: (): Connection[] => {
     return ConnectionRepository.findAll();
@@ -20,6 +26,10 @@ export const ConnectionService = {
 
   createConnection: (dto: CreateConnectionDto): Connection => {
     return ConnectionRepository.create(dto);
+  },
+
+  updateConnection: (id: string, dto: UpdateConnectionDto): Connection | null => {
+    return ConnectionRepository.update(id, dto);
   },
 
   deleteConnection: (id: string): boolean => {
