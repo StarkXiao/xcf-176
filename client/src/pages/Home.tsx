@@ -7,6 +7,7 @@ import { CaseSelector } from '@/components/CaseSelector';
 import { CollaboratorPanel } from '@/components/CollaboratorPanel';
 import { TimelinePanel } from '@/components/TimelinePanel';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
+import { EvidenceCollectionPanel } from '@/components/EvidenceCollectionPanel';
 import { ScanlineEffect } from '@/components/ui/ScanlineEffect';
 import { useUiStore } from '@/store/useUiStore';
 import { useCaseStore } from '@/store/useCaseStore';
@@ -22,6 +23,7 @@ const Home: React.FC = () => {
   const collaboratorPanelOpen = useUiStore((state) => state.collaboratorPanelOpen);
   const timelinePanelOpen = useUiStore((state) => state.timelinePanelOpen);
   const auditLogPanelOpen = useUiStore((state) => state.auditLogPanelOpen);
+  const evidenceCollectionPanelOpen = useUiStore((state) => state.evidenceCollectionPanelOpen);
   const loadCollaborators = useCollaboratorStore((state) => state.loadCollaborators);
   const loadAuditLogs = useAuditLogStore((state) => state.loadAuditLogs);
 
@@ -53,6 +55,7 @@ const Home: React.FC = () => {
         {collaboratorPanelOpen && <CollaboratorPanel />}
         {timelinePanelOpen && <TimelinePanel />}
         {auditLogPanelOpen && <AuditLogPanel />}
+        {evidenceCollectionPanelOpen && <EvidenceCollectionPanel />}
         <PropertyPanel />
       </div>
 

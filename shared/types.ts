@@ -181,6 +181,43 @@ export interface TimelineEntry {
   collaboratorName?: string;
 }
 
+export type EvidenceSourceType = 'webpage_screenshot' | 'file_upload' | 'manual_entry';
+
+export type VerificationStatus = 'pending' | 'verified' | 'failed' | 'duplicate';
+
+export interface EvidenceCollectionItem {
+  id: string;
+  caseId: string;
+  sourceType: EvidenceSourceType;
+  content: string;
+  sourceUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
+  screenshotDataUrl?: string;
+  contentHash: string;
+  importance: Evidence['importance'];
+  tags: string[];
+  verificationStatus: VerificationStatus;
+  duplicateOf?: string;
+  collectedAt: string;
+  archivedAt?: string;
+  archivedEvidenceId?: string;
+}
+
+export interface CreateCollectionItemDto {
+  caseId: string;
+  sourceType: EvidenceSourceType;
+  content: string;
+  sourceUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
+  screenshotDataUrl?: string;
+  importance?: Evidence['importance'];
+  tags?: string[];
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
