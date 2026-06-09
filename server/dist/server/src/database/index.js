@@ -18,6 +18,8 @@ const createTables = () => {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      key_clues TEXT DEFAULT '[]',
       canvas_state TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -101,6 +103,62 @@ const createTables = () => {
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS consultations (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',
+      initiated_by TEXT NOT NULL,
+      evidence_ids TEXT DEFAULT '[]',
+      key_clues TEXT DEFAULT '[]',
+      concluded_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS consultation_discussions (
+      id TEXT PRIMARY KEY,
+      consultation_id TEXT NOT NULL,
+      collaborator_id TEXT NOT NULL,
+      collaborator_name TEXT NOT NULL DEFAULT '',
+      evidence_id TEXT,
+      content TEXT NOT NULL,
+      is_dispute INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS consultation_conclusions (
+      id TEXT PRIMARY KEY,
+      consultation_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      decided_by TEXT NOT NULL,
+      decided_by_name TEXT NOT NULL DEFAULT '',
+      case_status_update TEXT,
+      key_clues_update TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS consultation_disputes (
+      id TEXT PRIMARY KEY,
+      consultation_id TEXT NOT NULL,
+      discussion_id TEXT NOT NULL,
+      evidence_id TEXT,
+      description TEXT NOT NULL,
+      raised_by TEXT NOT NULL,
+      raised_by_name TEXT NOT NULL DEFAULT '',
+      resolution TEXT,
+      resolved_by TEXT,
+      resolved_by_name TEXT,
+      resolved_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE CASCADE,
+      FOREIGN KEY (discussion_id) REFERENCES consultation_discussions(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_evidence_case_id ON evidence(case_id);
     CREATE INDEX IF NOT EXISTS idx_connections_case_id ON connections(case_id);
     CREATE INDEX IF NOT EXISTS idx_connections_from ON connections(from_evidence_id);
@@ -112,16 +170,29 @@ const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_evidence_collection_case_id ON evidence_collection(case_id);
     CREATE INDEX IF NOT EXISTS idx_evidence_collection_content_hash ON evidence_collection(content_hash);
     CREATE INDEX IF NOT EXISTS idx_evidence_collection_status ON evidence_collection(verification_status);
+    CREATE INDEX IF NOT EXISTS idx_consultations_case_id ON consultations(case_id);
+    CREATE INDEX IF NOT EXISTS idx_consultations_status ON consultations(status);
+    CREATE INDEX IF NOT EXISTS idx_consultation_discussions_consultation_id ON consultation_discussions(consultation_id);
+    CREATE INDEX IF NOT EXISTS idx_consultation_conclusions_consultation_id ON consultation_conclusions(consultation_id);
+    CREATE INDEX IF NOT EXISTS idx_consultation_disputes_consultation_id ON consultation_disputes(consultation_id);
   `);
 };
 const runMigrations = () => {
     const evidenceColumns = db.prepare("PRAGMA table_info(evidence)").all();
-    const columnNames = evidenceColumns.map(c => c.name);
-    if (!columnNames.includes('assigned_to')) {
+    const evidenceColumnNames = evidenceColumns.map(c => c.name);
+    if (!evidenceColumnNames.includes('assigned_to')) {
         db.exec('ALTER TABLE evidence ADD COLUMN assigned_to TEXT DEFAULT NULL');
     }
-    if (!columnNames.includes('status')) {
+    if (!evidenceColumnNames.includes('status')) {
         db.exec("ALTER TABLE evidence ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
+    }
+    const caseColumns = db.prepare("PRAGMA table_info(cases)").all();
+    const caseColumnNames = caseColumns.map(c => c.name);
+    if (!caseColumnNames.includes('status')) {
+        db.exec("ALTER TABLE cases ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
+    }
+    if (!caseColumnNames.includes('key_clues')) {
+        db.exec("ALTER TABLE cases ADD COLUMN key_clues TEXT DEFAULT '[]'");
     }
 };
 const seedData = () => {
@@ -418,6 +489,96 @@ const seedData = () => {
     ];
     for (const l of auditLogs) {
         insertAuditLog.run(l.id, caseId, l.collaboratorId, l.collaboratorName, l.action, l.targetType, l.targetId, l.detail, l.snapshot, l.createdAt);
+    }
+    const insertConsultation = db.prepare(`
+    INSERT INTO consultations (id, case_id, title, description, status, initiated_by, evidence_ids, key_clues, concluded_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+    const consultations = [
+        {
+            id: 'con-001',
+            title: '500万资金流向专项会商',
+            description: '围绕500万转账记录和资金流向，讨论资金追回可能性与下一步侦查方向',
+            status: 'concluded',
+            initiatedBy: 'col-001',
+            evidenceIds: ['ev-004', 'ev-009'],
+            keyClues: ['地下钱庄中转', '虚拟货币出境'],
+            concludedAt: '2024-07-01T10:00:00Z',
+            createdAt: '2024-06-29T09:00:00Z',
+            updatedAt: '2024-07-01T10:00:00Z',
+        },
+        {
+            id: 'con-002',
+            title: '嫌疑人身份确认会商',
+            description: '综合聊天记录和IP分析报告，讨论嫌疑人真实身份及抓捕方案',
+            status: 'in_progress',
+            initiatedBy: 'col-002',
+            evidenceIds: ['ev-001', 'ev-007', 'ev-008'],
+            keyClues: ['王总与张婷是否同一团伙'],
+            concludedAt: null,
+            createdAt: '2024-07-02T14:00:00Z',
+            updatedAt: '2024-07-02T14:00:00Z',
+        },
+    ];
+    for (const c of consultations) {
+        insertConsultation.run(c.id, caseId, c.title, c.description, c.status, c.initiatedBy, JSON.stringify(c.evidenceIds), JSON.stringify(c.keyClues), c.concludedAt, c.createdAt, c.updatedAt);
+    }
+    const insertDiscussion = db.prepare(`
+    INSERT INTO consultation_discussions (id, consultation_id, collaborator_id, collaborator_name, evidence_id, content, is_dispute, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+    const discussions = [
+        { id: 'disc-001', consultationId: 'con-001', collaboratorId: 'col-001', collaboratorName: '张队长', evidenceId: 'ev-004', content: '500万从李某账户转出到张某账户后，14分钟内就转出了480万，速度极快，说明有预案。', isDispute: false, createdAt: '2024-06-29T09:15:00Z' },
+        { id: 'disc-002', consultationId: 'con-001', collaboratorId: 'col-002', collaboratorName: '李分析员', evidenceId: 'ev-009', content: '资金经过刘某某账户后分12笔转入地下钱庄，最终流向境外虚拟货币钱包。需要联系反洗钱中心进一步追踪。', isDispute: false, createdAt: '2024-06-29T09:30:00Z' },
+        { id: 'disc-003', consultationId: 'con-001', collaboratorId: 'col-003', collaboratorName: '王操作员', evidenceId: null, content: '我认为资金已经完全无法追回，建议直接转刑事起诉，不要再浪费资源追踪。', isDispute: true, createdAt: '2024-06-29T09:45:00Z' },
+        { id: 'disc-004', consultationId: 'con-001', collaboratorId: 'col-001', collaboratorName: '张队长', evidenceId: null, content: '不能轻易放弃。即使资金出境，通过国际合作仍有可能冻结部分虚拟货币资产。', isDispute: false, createdAt: '2024-06-29T10:00:00Z' },
+        { id: 'disc-005', consultationId: 'con-002', collaboratorId: 'col-002', collaboratorName: '李分析员', evidenceId: 'ev-007', content: 'IP定位显示服务器实际在缅甸果敢，这和通话录音中嫌疑人提到的"在国外"吻合。', isDispute: false, createdAt: '2024-07-02T14:15:00Z' },
+        { id: 'disc-006', consultationId: 'con-002', collaboratorId: 'col-004', collaboratorName: '赵审核员', evidenceId: 'ev-001', content: '微信中的"王总"和Telegram的"张婷"是否为同一人操控？两个角色的语气差异较大。', isDispute: false, createdAt: '2024-07-02T14:30:00Z' },
+    ];
+    for (const d of discussions) {
+        insertDiscussion.run(d.id, d.consultationId, d.collaboratorId, d.collaboratorName, d.evidenceId, d.content, d.isDispute ? 1 : 0, d.createdAt);
+    }
+    const insertConclusion = db.prepare(`
+    INSERT INTO consultation_conclusions (id, consultation_id, content, decided_by, decided_by_name, case_status_update, key_clues_update, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+    const conclusions = [
+        {
+            id: 'ccl-001',
+            consultationId: 'con-001',
+            content: '会议决定：1) 继续通过反洗钱中心追踪虚拟货币流向，争取冻结部分资产；2) 联系缅甸警方协助调查果敢地区窝点；3) 对刘某和张某的银行账户进行司法冻结。资金追回工作不应放弃。',
+            decidedBy: 'col-001',
+            decidedByName: '张队长',
+            caseStatusUpdate: 'in_progress',
+            keyCluesUpdate: ['地下钱庄中转', '虚拟货币出境', '缅甸果敢窝点'],
+            createdAt: '2024-07-01T10:00:00Z',
+        },
+    ];
+    for (const c of conclusions) {
+        insertConclusion.run(c.id, c.consultationId, c.content, c.decidedBy, c.decidedByName, c.caseStatusUpdate, c.keyCluesUpdate ? JSON.stringify(c.keyCluesUpdate) : null, c.createdAt);
+    }
+    const insertDispute = db.prepare(`
+    INSERT INTO consultation_disputes (id, consultation_id, discussion_id, evidence_id, description, raised_by, raised_by_name, resolution, resolved_by, resolved_by_name, resolved_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+    const disputes = [
+        {
+            id: 'dsp-001',
+            consultationId: 'con-001',
+            discussionId: 'disc-003',
+            evidenceId: null,
+            description: '王操作员认为应放弃资金追回，直接转刑事起诉',
+            raisedBy: 'col-003',
+            raisedByName: '王操作员',
+            resolution: '经讨论，保留追回资金的可能性，同时推进刑事程序',
+            resolvedBy: 'col-001',
+            resolvedByName: '张队长',
+            resolvedAt: '2024-07-01T09:30:00Z',
+            createdAt: '2024-06-29T09:45:00Z',
+        },
+    ];
+    for (const d of disputes) {
+        insertDispute.run(d.id, d.consultationId, d.discussionId, d.evidenceId, d.description, d.raisedBy, d.raisedByName, d.resolution, d.resolvedBy, d.resolvedByName, d.resolvedAt, d.createdAt);
     }
 };
 createTables();

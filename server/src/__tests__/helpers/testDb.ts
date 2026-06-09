@@ -5,6 +5,8 @@ const SCHEMA = `
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    key_clues TEXT DEFAULT '[]',
     canvas_state TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -116,7 +118,7 @@ export function resetTestDb(): void {
 export function seedTestCase(db: Database.Database, id: string, name: string, description: string = ''): void {
   const now = new Date().toISOString();
   db.prepare(
-    "INSERT OR IGNORE INTO cases (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+    "INSERT OR IGNORE INTO cases (id, name, description, status, key_clues, created_at, updated_at) VALUES (?, ?, ?, 'pending', '[]', ?, ?)"
   ).run(id, name, description, now, now);
 }
 

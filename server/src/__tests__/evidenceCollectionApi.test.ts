@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { evidenceCollectionRoutes } from '../routes/evidenceCollectionRoutes.js';
 import { getTestDb, resetTestDb, seedTestCase, seedTestCollaborators } from './helpers/testDb.js';
 
@@ -15,7 +16,7 @@ const COL_A_NAME = '接口操作员A';
 const COL_B_ID = 'api-col-002';
 const COL_B_NAME = '接口审核员B';
 
-let server: Fastify.FastifyInstance;
+let server: FastifyInstance;
 
 function seedCase() {
   const db = getTestDb();

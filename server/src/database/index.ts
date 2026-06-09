@@ -24,6 +24,8 @@ const createTables = () => {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      key_clues TEXT DEFAULT '[]',
       canvas_state TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -184,13 +186,23 @@ const createTables = () => {
 
 const runMigrations = () => {
   const evidenceColumns = db.prepare("PRAGMA table_info(evidence)").all() as { name: string }[];
-  const columnNames = evidenceColumns.map(c => c.name);
+  const evidenceColumnNames = evidenceColumns.map(c => c.name);
 
-  if (!columnNames.includes('assigned_to')) {
+  if (!evidenceColumnNames.includes('assigned_to')) {
     db.exec('ALTER TABLE evidence ADD COLUMN assigned_to TEXT DEFAULT NULL');
   }
-  if (!columnNames.includes('status')) {
+  if (!evidenceColumnNames.includes('status')) {
     db.exec("ALTER TABLE evidence ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
+  }
+
+  const caseColumns = db.prepare("PRAGMA table_info(cases)").all() as { name: string }[];
+  const caseColumnNames = caseColumns.map(c => c.name);
+
+  if (!caseColumnNames.includes('status')) {
+    db.exec("ALTER TABLE cases ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
+  }
+  if (!caseColumnNames.includes('key_clues')) {
+    db.exec("ALTER TABLE cases ADD COLUMN key_clues TEXT DEFAULT '[]'");
   }
 };
 

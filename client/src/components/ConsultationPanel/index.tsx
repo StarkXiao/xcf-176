@@ -31,6 +31,7 @@ import type {
   ConsultationConclusion,
   ConsultationDispute,
   ConsultationWithDetails,
+  TaskStatus,
 } from '@/types';
 
 const STATUS_LABELS: Record<ConsultationStatus, string> = {
@@ -49,8 +50,16 @@ const STATUS_COLORS: Record<ConsultationStatus, string> = {
 
 type TabType = 'discussions' | 'conclusions' | 'disputes';
 
+const CASE_STATUS_LABELS: Record<TaskStatus, string> = {
+  pending: '待处理',
+  in_progress: '进行中',
+  completed: '已完成',
+  reviewed: '已审核',
+};
+
 export const ConsultationPanel: React.FC = () => {
   const currentCase = useCaseStore((s) => s.currentCase);
+  const loadCase = useCaseStore((s) => s.loadCase);
   const consultations = useConsultationStore((s) => s.consultations);
   const currentConsultation = useConsultationStore((s) => s.currentConsultation);
   const loadConsultations = useConsultationStore((s) => s.loadConsultations);
@@ -75,6 +84,8 @@ export const ConsultationPanel: React.FC = () => {
   const [discussionText, setDiscussionText] = useState('');
   const [selectedDiscussionEvidence, setSelectedDiscussionEvidence] = useState<string>('');
   const [conclusionText, setConclusionText] = useState('');
+  const [conclusionCaseStatus, setConclusionCaseStatus] = useState<TaskStatus | ''>('');
+  const [conclusionKeyClues, setConclusionKeyClues] = useState('');
   const [disputeDescription, setDisputeDescription] = useState('');
   const [disputeDiscussionId, setDisputeDiscussionId] = useState('');
   const [resolutionText, setResolutionText] = useState('');
@@ -142,9 +153,18 @@ export const ConsultationPanel: React.FC = () => {
       content: conclusionText.trim(),
       decidedBy: currentCollaboratorId,
       decidedByName: currentCollaborator?.name ?? '',
+      caseStatusUpdate: conclusionCaseStatus || undefined,
+      keyCluesUpdate: conclusionKeyClues.trim()
+        ? conclusionKeyClues.trim().split(/[,，;；]/).map((s) => s.trim()).filter(Boolean)
+        : undefined,
     });
     await recordAuditLog('add_conclusion', 'case', currentConsultation.id, `形成结论: ${conclusionText.trim().slice(0, 30)}`);
+    if (currentCase) {
+      await loadCase(currentCase.id);
+    }
     setConclusionText('');
+    setConclusionCaseStatus('');
+    setConclusionKeyClues('');
   };
 
   const handleRaiseDispute = async () => {
@@ -476,8 +496,22 @@ export const ConsultationPanel: React.FC = () => {
           <div className="text-xs font-mono leading-relaxed" style={{ color: CYBERPUNK_COLORS.textPrimary }}>
             {c.content}
           </div>
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {c.caseStatusUpdate && (
+              <span
+                className="text-xs font-mono px-1.5 py-0.5 rounded-sm"
+                style={{
+                  backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.1),
+                  color: CYBERPUNK_COLORS.accentCyan,
+                  border: `1px solid ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.2)}`,
+                }}
+              >
+                案件状态 → {CASE_STATUS_LABELS[c.caseStatusUpdate] ?? c.caseStatusUpdate}
+              </span>
+            )}
+          </div>
           {c.keyCluesUpdate && c.keyCluesUpdate.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
+            <div className="flex flex-wrap gap-1 mt-1">
               {c.keyCluesUpdate.map((clue, idx) => (
                 <span
                   key={idx}
@@ -840,6 +874,31 @@ export const ConsultationPanel: React.FC = () => {
                   placeholder="输入结论纪要..."
                   value={conclusionText}
                   onChange={(e) => setConclusionText(e.target.value)}
+                />
+                <div className="flex gap-2 items-center">
+                  <span className="text-xs font-mono flex-shrink-0" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+                    案件状态→
+                  </span>
+                  <select
+                    value={conclusionCaseStatus}
+                    onChange={(e) => setConclusionCaseStatus(e.target.value as TaskStatus | '')}
+                    className="flex-1 text-xs font-mono px-1.5 py-1 border rounded-sm"
+                    style={{
+                      backgroundColor: CYBERPUNK_COLORS.bgPrimary,
+                      borderColor: CYBERPUNK_COLORS.borderColor,
+                      color: conclusionCaseStatus ? CYBERPUNK_COLORS.accentCyan : CYBERPUNK_COLORS.textSecondary,
+                    }}
+                  >
+                    <option value="">不变更</option>
+                    {(Object.keys(CASE_STATUS_LABELS) as TaskStatus[]).map((s) => (
+                      <option key={s} value={s}>{CASE_STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
+                </div>
+                <NeonInput
+                  placeholder="重点线索（逗号分隔，如：地下钱庄,虚拟货币出境）"
+                  value={conclusionKeyClues}
+                  onChange={(e) => setConclusionKeyClues(e.target.value)}
                 />
                 <NeonButton
                   size="sm"

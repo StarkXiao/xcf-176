@@ -2,6 +2,8 @@ export interface Case {
   id: string;
   name: string;
   description: string;
+  status: TaskStatus;
+  keyClues: string[];
   createdAt: string;
   updatedAt: string;
   canvasState?: CanvasState;
@@ -220,6 +222,8 @@ export interface CreateCaseDto {
 export interface UpdateCaseDto {
   name?: string;
   description?: string;
+  status?: TaskStatus;
+  keyClues?: string[];
   canvasState?: CanvasState;
 }
 

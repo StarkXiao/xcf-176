@@ -12,6 +12,7 @@ import type {
   ConsultationConclusion,
   ConsultationDispute,
   ConsultationDiscussion,
+  TaskStatus,
 } from '@shared/types';
 
 export const ConsultationService = {
@@ -60,29 +61,33 @@ export const ConsultationService = {
     if (!consultation) throw new Error('Consultation not found');
 
     const now = new Date().toISOString();
+
+    if (dto.keyCluesUpdate && dto.keyCluesUpdate.length > 0) {
+      const existingClues = consultation.keyClues ?? [];
+      const mergedClues = [...new Set([...existingClues, ...dto.keyCluesUpdate])];
+      ConsultationRepository.update(dto.consultationId, { keyClues: mergedClues });
+    }
+
     ConsultationRepository.update(dto.consultationId, {
       status: 'concluded',
       concludedAt: now,
     });
 
-    if (dto.caseStatusUpdate || dto.keyCluesUpdate) {
-      const caseUpdate: Record<string, unknown> = {};
-      if (dto.keyCluesUpdate && dto.keyCluesUpdate.length > 0) {
-        const existingClues = consultation.keyClues ?? [];
-        const mergedClues = [...new Set([...existingClues, ...dto.keyCluesUpdate])];
-        ConsultationRepository.update(dto.consultationId, { keyClues: mergedClues });
-      }
-    }
-
     const conclusion = ConsultationRepository.addConclusion(dto);
 
+    const caseUpdate: { status?: TaskStatus; keyClues?: string[] } = {};
     if (dto.caseStatusUpdate) {
+      caseUpdate.status = dto.caseStatusUpdate;
+    }
+    if (dto.keyCluesUpdate && dto.keyCluesUpdate.length > 0) {
       const caseData = CaseRepository.findById(consultation.caseId);
       if (caseData) {
-        CaseRepository.update(consultation.caseId, {
-          description: caseData.description,
-        });
+        const existingCaseClues = caseData.keyClues ?? [];
+        caseUpdate.keyClues = [...new Set([...existingCaseClues, ...dto.keyCluesUpdate])];
       }
+    }
+    if (Object.keys(caseUpdate).length > 0) {
+      CaseRepository.update(consultation.caseId, caseUpdate);
     }
 
     return conclusion;

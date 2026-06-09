@@ -1,8 +1,8 @@
 import Database from 'better-sqlite3';
 import Fastify from 'fastify';
-import { evidenceCollectionRoutes } from '../routes/evidenceCollectionRoutes.js';
-import { CaseRepository } from '../repositories/CaseRepository.js';
-import { CollaboratorRepository } from '../repositories/CollaboratorRepository.js';
+import { evidenceCollectionRoutes } from '../../routes/evidenceCollectionRoutes.js';
+import { CaseRepository } from '../../repositories/CaseRepository.js';
+import { CollaboratorRepository } from '../../repositories/CollaboratorRepository.js';
 
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -14,6 +14,8 @@ export function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      key_clues TEXT DEFAULT '[]',
       canvas_state TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -115,7 +117,7 @@ export function seedTestData(db: Database.Database): TestContext {
   const caseId = 'test-case-001';
 
   db.prepare(
-    "INSERT INTO cases (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO cases (id, name, description, status, key_clues, created_at, updated_at) VALUES (?, ?, ?, 'pending', '[]', ?, ?)"
   ).run(caseId, '测试案件', '自动化测试案件', now, now);
 
   const collaboratorId = 'test-col-001';
