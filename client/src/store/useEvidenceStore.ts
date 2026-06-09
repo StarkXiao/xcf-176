@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { evidenceApi } from '@/api/evidenceApi';
-import { recordAuditLog } from '@/utils/auditHelper';
+import { recordAuditLog, captureEvidenceSnapshot } from '@/utils/auditHelper';
 import type { Evidence, UpdateEvidenceDto, CreateEvidenceDto } from '@/types';
 
 interface EvidenceState {
@@ -58,12 +58,14 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
   updateEvidence: async (id, data) => {
     set({ loading: true, error: null });
     try {
+      const before = get().evidence[id];
+      const snapshot = before ? captureEvidenceSnapshot(before) : undefined;
       const response = await evidenceApi.update(id, data);
       if (response.success && response.data) {
         set((state) => ({
           evidence: { ...state.evidence, [id]: response.data! },
         }));
-        recordAuditLog('update_evidence', 'evidence', id, `更新证据: ${response.data.content.slice(0, 40)}`);
+        recordAuditLog('update_evidence', 'evidence', id, `更新证据: ${response.data.content.slice(0, 40)}`, snapshot);
       } else {
         set({ error: response.error || 'Failed to update evidence' });
       }
@@ -92,6 +94,7 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
     try {
       const existing = get().evidence[id];
       const contentPreview = existing?.content.slice(0, 40) || id;
+      const snapshot = existing ? captureEvidenceSnapshot(existing) : undefined;
       const response = await evidenceApi.delete(id);
       if (response.success) {
         set((state) => {
@@ -99,7 +102,7 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
           delete newEvidence[id];
           return { evidence: newEvidence };
         });
-        recordAuditLog('delete_evidence', 'evidence', id, `删除证据: ${contentPreview}`);
+        recordAuditLog('delete_evidence', 'evidence', id, `删除证据: ${contentPreview}`, snapshot);
       } else {
         set({ error: response.error || 'Failed to delete evidence' });
       }

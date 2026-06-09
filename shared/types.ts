@@ -80,7 +80,8 @@ export type AuditAction =
   | 'remove_collaborator'
   | 'create_case'
   | 'update_case'
-  | 'delete_case';
+  | 'delete_case'
+  | 'restore_snapshot';
 
 export interface AuditLog {
   id: string;

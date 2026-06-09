@@ -1,5 +1,7 @@
 import { request } from './client';
-import type { AuditLog, CreateAuditLogDto, TimelineEntry, ApiResponse } from '@/types';
+import type { AuditLog, CreateAuditLogDto, TimelineEntry, Evidence, Connection, ApiResponse } from '@/types';
+
+type RestoreResult = { evidence?: Evidence; connection?: Connection };
 
 export const auditLogApi = {
   async getByCaseId(caseId: string): Promise<ApiResponse<AuditLog[]>> {
@@ -19,5 +21,12 @@ export const auditLogApi = {
 
   async getTimelineByCaseId(caseId: string): Promise<ApiResponse<TimelineEntry[]>> {
     return request<TimelineEntry[]>(`/audit-logs/timeline/${caseId}`);
+  },
+
+  async restoreFromSnapshot(auditLogId: string): Promise<ApiResponse<RestoreResult>> {
+    return request<RestoreResult>(`/audit-logs/restore/${auditLogId}`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
   },
 };

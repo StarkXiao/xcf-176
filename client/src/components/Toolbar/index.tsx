@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import { CollaboratorSelector } from '@/components/CollaboratorSelector';
 import { useUiStore } from '@/store/useUiStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useZoom } from '@/hooks/useZoom';
@@ -148,6 +149,13 @@ export const Toolbar: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-4">
+        <CollaboratorSelector />
+
+        <div
+          className="h-6 w-px"
+          style={{ backgroundColor: CYBERPUNK_COLORS.borderColor }}
+        />
+
         <StatusIndicator
           status={saveStatus}
           label={

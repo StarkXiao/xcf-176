@@ -23,6 +23,7 @@ interface CanvasState {
   setConnections: (connections: Connection[]) => void;
   addConnection: (connection: Connection) => void;
   removeConnection: (id: string) => void;
+  updateConnection: (connection: Connection) => void;
   startDrawingConnection: (fromId: string, startX: number, startY: number) => void;
   updateDrawingConnection: (endX: number, endY: number) => void;
   endDrawingConnection: () => void;
@@ -60,6 +61,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   removeConnection: (id) => {
     set((state) => ({
       connections: state.connections.filter((c) => c.id !== id),
+    }));
+  },
+
+  updateConnection: (connection) => {
+    set((state) => ({
+      connections: state.connections.map((c) =>
+        c.id === connection.id ? connection : c
+      ),
     }));
   },
 

@@ -6,4 +6,12 @@ export const auditLogRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/collaborator/:collaboratorId', AuditLogController.getAuditLogsByCollaboratorId);
   fastify.post('/', AuditLogController.createAuditLog);
   fastify.get('/timeline/:caseId', AuditLogController.getTimelineByCaseId);
+  fastify.post('/restore/:auditLogId', {
+    schema: {
+      body: {
+        type: 'object',
+        nullable: true,
+      },
+    },
+  }, AuditLogController.restoreFromSnapshot);
 };

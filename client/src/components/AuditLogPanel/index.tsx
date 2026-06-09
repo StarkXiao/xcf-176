@@ -1,11 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollText, X, ChevronDown, ChevronUp, Search, Plus, Edit3, Trash2, UserPlus, Activity } from 'lucide-react';
+import { ScrollText, X, ChevronDown, ChevronUp, Search, Plus, Edit3, Trash2, UserPlus, Activity, Eye, RotateCcw, Users } from 'lucide-react';
 import { NeonInput } from '@/components/ui/NeonInput';
+import { SnapshotViewer } from '@/components/SnapshotViewer';
 import { useCaseStore } from '@/store/useCaseStore';
 import { useAuditLogStore } from '@/store/useAuditLogStore';
+import { useCollaboratorStore } from '@/store/useCollaboratorStore';
+import { useEvidenceStore } from '@/store/useEvidenceStore';
+import { useCanvasStore } from '@/store/useCanvasStore';
 import { useUiStore } from '@/store/useUiStore';
+import { auditLogApi } from '@/api/auditLogApi';
+import { recordAuditLog } from '@/utils/auditHelper';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
-import type { AuditAction } from '@/types';
+import type { AuditAction, AuditLog } from '@/types';
 
 type AuditFilter = 'all' | 'create' | 'update' | 'delete' | 'assign' | 'status';
 
@@ -24,6 +30,7 @@ const ACTION_LABELS: { [key in AuditAction]: string } = {
   create_case: '创建案件',
   update_case: '更新案件',
   delete_case: '删除案件',
+  restore_snapshot: '恢复快照',
 };
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {
@@ -57,6 +64,7 @@ function getActionPrefix(action: AuditAction): string {
   if (action.startsWith('delete') || action.startsWith('remove')) return 'delete';
   if (action.startsWith('assign')) return 'assign';
   if (action.startsWith('change_status')) return 'status';
+  if (action.startsWith('restore')) return 'update';
   return 'update';
 }
 
@@ -65,10 +73,13 @@ export const AuditLogPanel: React.FC = () => {
   const auditLogs = useAuditLogStore((s) => s.auditLogs);
   const loadAuditLogs = useAuditLogStore((s) => s.loadAuditLogs);
   const toggleAuditLogPanel = useUiStore((s) => s.toggleAuditLogPanel);
+  const collaborators = useCollaboratorStore((s) => s.collaborators);
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<AuditFilter>('all');
+  const [memberFilter, setMemberFilter] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [viewingLog, setViewingLog] = useState<AuditLog | null>(null);
 
   useEffect(() => {
     if (currentCase) {
@@ -83,6 +94,10 @@ export const AuditLogPanel: React.FC = () => {
       result = result.filter((l) => getActionPrefix(l.action) === filter);
     }
 
+    if (memberFilter !== 'all') {
+      result = result.filter((l) => l.collaboratorId === memberFilter);
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -94,7 +109,7 @@ export const AuditLogPanel: React.FC = () => {
     }
 
     return result;
-  }, [auditLogs, filter, search]);
+  }, [auditLogs, filter, memberFilter, search]);
 
   const formatTimestamp = (ts: string) => {
     const d = new Date(ts);
@@ -104,6 +119,33 @@ export const AuditLogPanel: React.FC = () => {
     const hh = String(d.getHours()).padStart(2, '0');
     const mi = String(d.getMinutes()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+  };
+
+  const handleRestore = async (auditLogId: string) => {
+    try {
+      const response = await auditLogApi.restoreFromSnapshot(auditLogId);
+      if (response.success && response.data) {
+        const { evidence: restoredEvidence, connection: restoredConnection } = response.data;
+        if (restoredEvidence) {
+          useEvidenceStore.getState().setEvidence([
+            ...useEvidenceStore.getState().getEvidenceArray().map((e) =>
+              e.id === restoredEvidence.id ? restoredEvidence : e
+            ),
+          ]);
+          recordAuditLog('restore_snapshot', 'evidence', restoredEvidence.id, `恢复证据快照: ${restoredEvidence.content.slice(0, 30)}`);
+        }
+        if (restoredConnection) {
+          useCanvasStore.getState().updateConnection(restoredConnection);
+          recordAuditLog('restore_snapshot', 'connection', restoredConnection.id, `恢复关联快照: ${restoredConnection.label || '关系连线'}`);
+        }
+        if (currentCase) {
+          loadAuditLogs(currentCase.id);
+        }
+        setViewingLog(null);
+      }
+    } catch (error) {
+      console.error('Restore failed:', error);
+    }
   };
 
   return (
@@ -176,6 +218,26 @@ export const AuditLogPanel: React.FC = () => {
             </button>
           ))}
         </div>
+        <div className="flex items-center gap-1.5">
+          <Users size={12} style={{ color: CYBERPUNK_COLORS.textSecondary }} />
+          <select
+            value={memberFilter}
+            onChange={(e) => setMemberFilter(e.target.value)}
+            className="flex-1 text-xs font-mono px-2 py-1 rounded-sm border"
+            style={{
+              backgroundColor: CYBERPUNK_COLORS.bgPrimary,
+              borderColor: CYBERPUNK_COLORS.borderColor,
+              color: memberFilter === 'all' ? CYBERPUNK_COLORS.textSecondary : CYBERPUNK_COLORS.accentPurple,
+            }}
+          >
+            <option value="all">全部成员</option>
+            {collaborators.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.role})
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -191,6 +253,8 @@ export const AuditLogPanel: React.FC = () => {
           const prefix = getActionPrefix(log.action);
           const barColor = ACTION_BAR_COLORS[prefix] || CYBERPUNK_COLORS.accentYellow;
           const isExpanded = expandedId === log.id;
+          const hasSnapshot = !!log.snapshot;
+          const canRestore = (log.targetType === 'evidence' || log.targetType === 'connection') && hasSnapshot;
 
           return (
             <div
@@ -227,7 +291,7 @@ export const AuditLogPanel: React.FC = () => {
                       {ACTION_LABELS[log.action] || log.action}
                     </span>
                     <span
-                      className="text-xs font-mono truncate"
+                      className="text-xs font-mono truncate flex-1"
                       style={{ color: CYBERPUNK_COLORS.textPrimary }}
                     >
                       {log.detail.slice(0, 30)}
@@ -247,21 +311,55 @@ export const AuditLogPanel: React.FC = () => {
                       {formatTimestamp(log.createdAt)}
                     </span>
                   </div>
-                  {log.snapshot && (
-                    <button
-                      className="mt-1 p-0.5 transition-colors"
-                      style={{ color: CYBERPUNK_COLORS.textSecondary }}
-                      onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                    >
-                      {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {hasSnapshot && (
+                      <button
+                        className="flex items-center gap-1 px-1.5 py-0.5 text-xs font-mono rounded-sm border transition-all"
+                        style={{
+                          borderColor: CYBERPUNK_COLORS.accentPurple,
+                          color: CYBERPUNK_COLORS.accentPurple,
+                          backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentPurple, 0.08),
+                        }}
+                        onClick={() => setViewingLog(log)}
+                        title="查看快照"
+                      >
+                        <Eye size={10} />
+                        快照
+                      </button>
+                    )}
+                    {canRestore && (
+                      <button
+                        className="flex items-center gap-1 px-1.5 py-0.5 text-xs font-mono rounded-sm border transition-all"
+                        style={{
+                          borderColor: CYBERPUNK_COLORS.accentCyan,
+                          color: CYBERPUNK_COLORS.accentCyan,
+                          backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.08),
+                        }}
+                        onClick={() => setViewingLog(log)}
+                        title="恢复到此状态"
+                      >
+                        <RotateCcw size={10} />
+                        恢复
+                      </button>
+                    )}
+                    {hasSnapshot && !canRestore && (
+                      <button
+                        className="p-0.5 transition-colors"
+                        style={{ color: CYBERPUNK_COLORS.textSecondary }}
+                        onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                      >
+                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                    )}
+                  </div>
                   {isExpanded && log.snapshot && (
                     <div
-                      className="mt-1 text-xs font-mono p-1.5 rounded-sm"
+                      className="mt-1.5 text-xs font-mono p-1.5 rounded-sm"
                       style={{
                         backgroundColor: CYBERPUNK_COLORS.bgPrimary,
                         color: CYBERPUNK_COLORS.textSecondary,
+                        maxHeight: 120,
+                        overflow: 'auto',
                       }}
                     >
                       {log.snapshot}
@@ -273,6 +371,14 @@ export const AuditLogPanel: React.FC = () => {
           );
         })}
       </div>
+
+      {viewingLog && (
+        <SnapshotViewer
+          log={viewingLog}
+          onRestore={handleRestore}
+          onClose={() => setViewingLog(null)}
+        />
+      )}
     </div>
   );
 };

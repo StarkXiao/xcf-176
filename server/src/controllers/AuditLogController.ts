@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { AuditLogService } from '../services/AuditLogService.js';
-import type { CreateAuditLogDto, ApiResponse, AuditLog, TimelineEntry } from '@shared/types';
+import type { CreateAuditLogDto, ApiResponse, AuditLog, TimelineEntry, Evidence, Connection } from '@shared/types';
 
 interface CaseIdParams {
   Params: { caseId: string };
@@ -9,6 +9,12 @@ interface CaseIdParams {
 interface CollaboratorIdParams {
   Params: { collaboratorId: string };
 }
+
+interface AuditLogIdParams {
+  Params: { auditLogId: string };
+}
+
+type RestoreResult = { evidence?: Evidence; connection?: Connection };
 
 export const AuditLogController = {
   async getAuditLogsByCaseId(req: FastifyRequest<CaseIdParams>, reply: FastifyReply) {
@@ -63,6 +69,22 @@ export const AuditLogController = {
     } catch (error) {
       const response: ApiResponse<null> = { success: false, error: (error as Error).message };
       return reply.status(500).send(response);
+    }
+  },
+
+  async restoreFromSnapshot(req: FastifyRequest<AuditLogIdParams>, reply: FastifyReply) {
+    try {
+      const { auditLogId } = req.params;
+      const result = AuditLogService.restoreFromSnapshot(auditLogId);
+      const response: ApiResponse<RestoreResult> = {
+        success: true,
+        data: result,
+        message: '状态恢复成功',
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = { success: false, error: (error as Error).message };
+      return reply.status(400).send(response);
     }
   },
 };

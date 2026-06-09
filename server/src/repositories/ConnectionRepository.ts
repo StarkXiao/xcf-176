@@ -78,6 +78,26 @@ export const ConnectionRepository = {
     return result.changes > 0;
   },
 
+  update: (id: string, dto: Partial<Pick<Connection, 'label' | 'color' | 'lineStyle'>>): Connection | null => {
+    const existing = ConnectionRepository.findById(id);
+    if (!existing) return null;
+
+    const fields: string[] = [];
+    const values: unknown[] = [];
+
+    if (dto.label !== undefined) { fields.push('label = ?'); values.push(dto.label); }
+    if (dto.color !== undefined) { fields.push('color = ?'); values.push(dto.color); }
+    if (dto.lineStyle !== undefined) { fields.push('line_style = ?'); values.push(dto.lineStyle); }
+
+    if (fields.length > 0) {
+      values.push(id);
+      const stmt = db.prepare(`UPDATE connections SET ${fields.join(', ')} WHERE id = ?`);
+      stmt.run(...values);
+    }
+
+    return ConnectionRepository.findById(id);
+  },
+
   deleteByCaseId: (caseId: string): number => {
     const stmt = db.prepare('DELETE FROM connections WHERE case_id = ?');
     const result = stmt.run(caseId);
