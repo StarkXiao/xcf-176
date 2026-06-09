@@ -1,13 +1,12 @@
 import { create } from 'zustand';
 import { evidenceCollectionApi } from '@/api/evidenceCollectionApi';
-import { useEvidenceStore } from './useEvidenceStore';
-import { recordAuditLog } from '@/utils/auditHelper';
-import { generateEvidenceId } from '@/utils/idGenerator';
+import { evidenceApi } from '@/api/evidenceApi';
 import type {
   EvidenceCollectionItem,
   CreateCollectionItemDto,
   EvidenceSourceType,
   VerificationStatus,
+  Evidence,
 } from '@/types';
 
 async function computeContentHash(content: string, sourceType: EvidenceSourceType, extra?: string): Promise<string> {
@@ -95,7 +94,7 @@ export const useEvidenceCollectionStore = create<EvidenceCollectionState>((set, 
       const existing = get().checkDuplicate(contentHash, data.caseId);
       if (existing) {
         const duplicateItem: EvidenceCollectionItem = {
-          id: generateEvidenceId(),
+          id: existing.id,
           caseId: data.caseId,
           sourceType: data.sourceType,
           content: data.content,
@@ -128,7 +127,6 @@ export const useEvidenceCollectionStore = create<EvidenceCollectionState>((set, 
           verificationStatus: 'verified' as VerificationStatus,
         };
         set((state) => ({ items: [...state.items, item] }));
-        recordAuditLog('create_evidence', 'evidence', item.id, `采集证据(${data.sourceType}): ${data.content.slice(0, 30)}`);
         return item;
       }
       set({ error: response.error || '采集证据失败', loading: false });
@@ -171,32 +169,29 @@ export const useEvidenceCollectionStore = create<EvidenceCollectionState>((set, 
         return;
       }
 
-      const evidenceData = {
-        caseId: item.caseId,
-        content: item.content,
-        source: `${item.sourceType}${item.sourceUrl ? ': ' + item.sourceUrl : ''}${item.fileName ? ': ' + item.fileName : ''}`,
-        importance: item.importance,
-        tags: item.tags,
-        positionX: 100 + Math.random() * 400,
-        positionY: 100 + Math.random() * 400,
-      };
-
-      const createdEvidence = await useEvidenceStore.getState().addEvidence(evidenceData);
-      if (!createdEvidence) {
-        set({ error: '归档到案件失败', loading: false });
-        return;
-      }
-
       const response = await evidenceCollectionApi.archive(id);
       if (response.success && response.data) {
+        const archived = response.data;
+        const archivedEvidenceId = archived.archivedEvidenceId;
+
+        if (archivedEvidenceId) {
+          const evidenceResponse = await evidenceApi.getById(archivedEvidenceId);
+          if (evidenceResponse.success && evidenceResponse.data) {
+            const { useEvidenceStore } = await import('./useEvidenceStore');
+            useEvidenceStore.getState().setEvidence([
+              ...useEvidenceStore.getState().getEvidenceArray(),
+              evidenceResponse.data as Evidence,
+            ]);
+          }
+        }
+
         set((state) => ({
           items: state.items.map((i) =>
             i.id === id
-              ? { ...i, archivedAt: new Date().toISOString(), archivedEvidenceId: createdEvidence.id }
+              ? { ...i, archivedAt: archived.archivedAt || new Date().toISOString(), archivedEvidenceId }
               : i
           ),
         }));
-        recordAuditLog('create_evidence', 'evidence', createdEvidence.id, `归档证据: ${item.content.slice(0, 30)}`);
       }
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Unknown error' });

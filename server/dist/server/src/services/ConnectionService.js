@@ -15,6 +15,9 @@ export const ConnectionService = {
     createConnection: (dto) => {
         return ConnectionRepository.create(dto);
     },
+    updateConnection: (id, dto) => {
+        return ConnectionRepository.update(id, dto);
+    },
     deleteConnection: (id) => {
         return ConnectionRepository.delete(id);
     },

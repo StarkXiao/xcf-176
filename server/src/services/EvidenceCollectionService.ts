@@ -40,7 +40,7 @@ function verifySource(dto: CreateCollectionItemDto): { valid: boolean; reason?: 
   }
 }
 
-function recordAuditLog(caseId: string, action: string, targetType: string, targetId: string, detail: string, collaboratorId: string = 'system'): void {
+function recordAuditLog(caseId: string, action: string, targetType: string, targetId: string, detail: string, collaboratorId: string): void {
   const collaborator = CollaboratorRepository.findById(collaboratorId);
   const collabName = collaborator?.name ?? '系统';
   const dto: CreateAuditLogDto = {
@@ -63,7 +63,7 @@ export const EvidenceCollectionService = {
     return EvidenceCollectionRepository.findById(id);
   },
 
-  collect: (dto: CreateCollectionItemDto): { item: EvidenceCollectionItem; isDuplicate: boolean } => {
+  collect: (dto: CreateCollectionItemDto, collaboratorId: string): { item: EvidenceCollectionItem; isDuplicate: boolean } => {
     const verification = verifySource(dto);
     if (!verification.valid) {
       throw new Error(verification.reason || '来源校验失败');
@@ -79,7 +79,7 @@ export const EvidenceCollectionService = {
         'duplicate' as VerificationStatus,
         existing.id
       );
-      recordAuditLog(dto.caseId, 'create_evidence', 'evidence', item.id, `采集证据(重复): ${dto.content.slice(0, 30)}`);
+      recordAuditLog(dto.caseId, 'create_evidence', 'evidence', item.id, `采集证据(重复): ${dto.content.slice(0, 30)}`, collaboratorId);
       return { item, isDuplicate: true };
     }
 
@@ -87,11 +87,11 @@ export const EvidenceCollectionService = {
       { ...dto, contentHash },
       'verified' as VerificationStatus
     );
-    recordAuditLog(dto.caseId, 'create_evidence', 'evidence', item.id, `采集证据(${dto.sourceType}): ${dto.content.slice(0, 30)}`);
+    recordAuditLog(dto.caseId, 'create_evidence', 'evidence', item.id, `采集证据(${dto.sourceType}): ${dto.content.slice(0, 30)}`, collaboratorId);
     return { item, isDuplicate: false };
   },
 
-  verify: (id: string): EvidenceCollectionItem => {
+  verify: (id: string, collaboratorId: string): EvidenceCollectionItem => {
     const item = EvidenceCollectionRepository.findById(id);
     if (!item) throw new Error('采集项不存在');
 
@@ -103,11 +103,11 @@ export const EvidenceCollectionService = {
     }
 
     const updated = EvidenceCollectionRepository.updateVerificationStatus(id, 'verified');
-    recordAuditLog(item.caseId, 'update_evidence', 'evidence', id, `校验通过: ${item.content.slice(0, 30)}`);
+    recordAuditLog(item.caseId, 'update_evidence', 'evidence', id, `校验通过: ${item.content.slice(0, 30)}`, collaboratorId);
     return updated!;
   },
 
-  archive: (id: string): EvidenceCollectionItem => {
+  archive: (id: string, collaboratorId: string): EvidenceCollectionItem => {
     const item = EvidenceCollectionRepository.findById(id);
     if (!item) throw new Error('采集项不存在');
     if (item.verificationStatus === 'duplicate') throw new Error('重复证据不能归档');
@@ -128,16 +128,16 @@ export const EvidenceCollectionService = {
 
     const updated = EvidenceCollectionRepository.markArchived(id, createdEvidence.id);
 
-    recordAuditLog(item.caseId, 'create_evidence', 'evidence', createdEvidence.id, `归档证据: ${item.content.slice(0, 30)}`);
+    recordAuditLog(item.caseId, 'create_evidence', 'evidence', createdEvidence.id, `归档证据: ${item.content.slice(0, 30)}`, collaboratorId);
 
     return updated!;
   },
 
-  bulkArchive: (ids: string[]): EvidenceCollectionItem[] => {
+  bulkArchive: (ids: string[], collaboratorId: string): EvidenceCollectionItem[] => {
     const results: EvidenceCollectionItem[] = [];
     for (const id of ids) {
       try {
-        const archived = EvidenceCollectionService.archive(id);
+        const archived = EvidenceCollectionService.archive(id, collaboratorId);
         results.push(archived);
       } catch {
         continue;
@@ -146,12 +146,12 @@ export const EvidenceCollectionService = {
     return results;
   },
 
-  delete: (id: string): boolean => {
+  delete: (id: string, collaboratorId: string): boolean => {
     const item = EvidenceCollectionRepository.findById(id);
     if (!item) return false;
     const deleted = EvidenceCollectionRepository.delete(id);
     if (deleted) {
-      recordAuditLog(item.caseId, 'delete_evidence', 'evidence', id, `删除采集项: ${item.content.slice(0, 30)}`);
+      recordAuditLog(item.caseId, 'delete_evidence', 'evidence', id, `删除采集项: ${item.content.slice(0, 30)}`, collaboratorId);
     }
     return deleted;
   },

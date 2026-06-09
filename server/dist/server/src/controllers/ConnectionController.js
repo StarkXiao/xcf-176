@@ -111,6 +111,32 @@ export const ConnectionController = {
             return reply.status(500).send(response);
         }
     },
+    async updateConnection(req, reply) {
+        try {
+            const { id } = req.params;
+            const updated = ConnectionService.updateConnection(id, req.body);
+            if (!updated) {
+                const response = {
+                    success: false,
+                    error: '连线不存在',
+                };
+                return reply.status(404).send(response);
+            }
+            const response = {
+                success: true,
+                data: updated,
+                message: '连线更新成功',
+            };
+            return reply.send(response);
+        }
+        catch (error) {
+            const response = {
+                success: false,
+                error: error.message,
+            };
+            return reply.status(500).send(response);
+        }
+    },
     async deleteConnection(req, reply) {
         try {
             const { id } = req.params;

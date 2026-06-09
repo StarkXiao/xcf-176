@@ -13,6 +13,8 @@ const rowToEvidence = (row) => ({
     height: row.height,
     color: row.color,
     timestamp: row.timestamp ?? '',
+    assignedTo: row.assigned_to,
+    status: row.status,
     createdAt: row.created_at,
 });
 export const EvidenceRepository = {
@@ -31,14 +33,21 @@ export const EvidenceRepository = {
     },
     create: (dto) => {
         const id = uuidv4();
+        return EvidenceRepository._insert(id, dto);
+    },
+    createWithId: (id, dto) => {
+        return EvidenceRepository._insert(id, dto);
+    },
+    _insert: (id, dto) => {
         const now = new Date().toISOString();
         const stmt = db.prepare(`
       INSERT INTO evidence (
         id, case_id, content, source, importance, tags,
-        position_x, position_y, width, height, color, timestamp, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        position_x, position_y, width, height, color, timestamp,
+        assigned_to, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-        stmt.run(id, dto.caseId, dto.content, dto.source ?? 'unknown', dto.importance ?? 'normal', JSON.stringify(dto.tags ?? []), dto.positionX ?? 0, dto.positionY ?? 0, dto.width ?? 200, dto.height ?? 120, dto.color ?? '#3b82f6', dto.timestamp ?? null, now);
+        stmt.run(id, dto.caseId, dto.content, dto.source ?? 'unknown', dto.importance ?? 'normal', JSON.stringify(dto.tags ?? []), dto.positionX ?? 0, dto.positionY ?? 0, dto.width ?? 200, dto.height ?? 120, dto.color ?? '#3b82f6', dto.timestamp ?? null, dto.assignedTo ?? null, dto.status ?? 'pending', now);
         return EvidenceRepository.findById(id);
     },
     update: (id, dto) => {
@@ -86,6 +95,14 @@ export const EvidenceRepository = {
         if (dto.timestamp !== undefined) {
             fields.push('timestamp = ?');
             values.push(dto.timestamp);
+        }
+        if (dto.assignedTo !== undefined) {
+            fields.push('assigned_to = ?');
+            values.push(dto.assignedTo ?? null);
+        }
+        if (dto.status !== undefined) {
+            fields.push('status = ?');
+            values.push(dto.status);
         }
         values.push(id);
         if (fields.length > 0) {

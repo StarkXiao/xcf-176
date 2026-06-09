@@ -18,6 +18,10 @@ interface BulkArchiveBody {
   Body: { ids: string[] };
 }
 
+function getCollaboratorId(req: FastifyRequest): string {
+  return (req.headers['x-collaborator-id'] as string) || 'system';
+}
+
 export const EvidenceCollectionController = {
   async getByCaseId(req: FastifyRequest<CaseIdQuery>, reply: FastifyReply) {
     try {
@@ -43,7 +47,8 @@ export const EvidenceCollectionController = {
         return reply.status(400).send(response);
       }
 
-      const { item, isDuplicate } = EvidenceCollectionService.collect(req.body);
+      const collaboratorId = getCollaboratorId(req);
+      const { item, isDuplicate } = EvidenceCollectionService.collect(req.body, collaboratorId);
       const response: ApiResponse<EvidenceCollectionItem> = {
         success: true,
         data: item,
@@ -59,7 +64,8 @@ export const EvidenceCollectionController = {
   async verify(req: FastifyRequest<IdParams>, reply: FastifyReply) {
     try {
       const { id } = req.params;
-      const item = EvidenceCollectionService.verify(id);
+      const collaboratorId = getCollaboratorId(req);
+      const item = EvidenceCollectionService.verify(id, collaboratorId);
       const response: ApiResponse<EvidenceCollectionItem> = { success: true, data: item, message: '校验通过' };
       return reply.send(response);
     } catch (error) {
@@ -71,7 +77,8 @@ export const EvidenceCollectionController = {
   async archive(req: FastifyRequest<IdParams>, reply: FastifyReply) {
     try {
       const { id } = req.params;
-      const item = EvidenceCollectionService.archive(id);
+      const collaboratorId = getCollaboratorId(req);
+      const item = EvidenceCollectionService.archive(id, collaboratorId);
       const response: ApiResponse<EvidenceCollectionItem> = { success: true, data: item, message: '归档成功' };
       return reply.send(response);
     } catch (error) {
@@ -87,7 +94,8 @@ export const EvidenceCollectionController = {
         const response: ApiResponse<null> = { success: false, error: '请提供要归档的采集项ID列表' };
         return reply.status(400).send(response);
       }
-      const items = EvidenceCollectionService.bulkArchive(ids);
+      const collaboratorId = getCollaboratorId(req);
+      const items = EvidenceCollectionService.bulkArchive(ids, collaboratorId);
       const response: ApiResponse<EvidenceCollectionItem[]> = {
         success: true,
         data: items,
@@ -103,7 +111,8 @@ export const EvidenceCollectionController = {
   async deleteItem(req: FastifyRequest<IdParams>, reply: FastifyReply) {
     try {
       const { id } = req.params;
-      const deleted = EvidenceCollectionService.delete(id);
+      const collaboratorId = getCollaboratorId(req);
+      const deleted = EvidenceCollectionService.delete(id, collaboratorId);
       if (!deleted) {
         const response: ApiResponse<null> = { success: false, error: '采集项不存在' };
         return reply.status(404).send(response);

@@ -34,6 +34,12 @@ export const ConnectionRepository = {
     },
     create: (dto) => {
         const id = uuidv4();
+        return ConnectionRepository._insert(id, dto);
+    },
+    createWithId: (id, dto) => {
+        return ConnectionRepository._insert(id, dto);
+    },
+    _insert: (id, dto) => {
         const now = new Date().toISOString();
         const stmt = db.prepare(`
       INSERT INTO connections (
@@ -48,6 +54,31 @@ export const ConnectionRepository = {
         const stmt = db.prepare('DELETE FROM connections WHERE id = ?');
         const result = stmt.run(id);
         return result.changes > 0;
+    },
+    update: (id, dto) => {
+        const existing = ConnectionRepository.findById(id);
+        if (!existing)
+            return null;
+        const fields = [];
+        const values = [];
+        if (dto.label !== undefined) {
+            fields.push('label = ?');
+            values.push(dto.label);
+        }
+        if (dto.color !== undefined) {
+            fields.push('color = ?');
+            values.push(dto.color);
+        }
+        if (dto.lineStyle !== undefined) {
+            fields.push('line_style = ?');
+            values.push(dto.lineStyle);
+        }
+        if (fields.length > 0) {
+            values.push(id);
+            const stmt = db.prepare(`UPDATE connections SET ${fields.join(', ')} WHERE id = ?`);
+            stmt.run(...values);
+        }
+        return ConnectionRepository.findById(id);
     },
     deleteByCaseId: (caseId) => {
         const stmt = db.prepare('DELETE FROM connections WHERE case_id = ?');

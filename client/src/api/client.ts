@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { ApiResponse } from '@/types';
+import { useUiStore } from '@/store/useUiStore';
 
 const apiClient = axios.create({
   baseURL: 'http://localhost:3001/api',
@@ -7,6 +8,14 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+apiClient.interceptors.request.use((config) => {
+  const collaboratorId = useUiStore.getState().currentCollaboratorId;
+  if (collaboratorId) {
+    config.headers['X-Collaborator-Id'] = collaboratorId;
+  }
+  return config;
 });
 
 apiClient.interceptors.response.use(
