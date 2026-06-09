@@ -15,6 +15,8 @@ interface EvidenceRow {
   height: number;
   color: string;
   timestamp: string | null;
+  assigned_to: string | null;
+  status: string;
   created_at: string;
 }
 
@@ -31,6 +33,8 @@ const rowToEvidence = (row: EvidenceRow): Evidence => ({
   height: row.height,
   color: row.color,
   timestamp: row.timestamp ?? '',
+  assignedTo: row.assigned_to,
+  status: row.status as Evidence['status'],
   createdAt: row.created_at,
 });
 
@@ -57,8 +61,9 @@ export const EvidenceRepository = {
     const stmt = db.prepare(`
       INSERT INTO evidence (
         id, case_id, content, source, importance, tags,
-        position_x, position_y, width, height, color, timestamp, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        position_x, position_y, width, height, color, timestamp,
+        assigned_to, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       id,
@@ -73,6 +78,8 @@ export const EvidenceRepository = {
       dto.height ?? 120,
       dto.color ?? '#3b82f6',
       dto.timestamp ?? null,
+      dto.assignedTo ?? null,
+      dto.status ?? 'pending',
       now
     );
     return EvidenceRepository.findById(id)!;
@@ -124,6 +131,14 @@ export const EvidenceRepository = {
     if (dto.timestamp !== undefined) {
       fields.push('timestamp = ?');
       values.push(dto.timestamp);
+    }
+    if (dto.assignedTo !== undefined) {
+      fields.push('assigned_to = ?');
+      values.push(dto.assignedTo ?? null);
+    }
+    if (dto.status !== undefined) {
+      fields.push('status = ?');
+      values.push(dto.status);
     }
     values.push(id);
 

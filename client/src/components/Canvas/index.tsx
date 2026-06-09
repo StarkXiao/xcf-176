@@ -11,6 +11,7 @@ import { useCanvasStore } from '@/store/useCanvasStore';
 import { useCaseStore } from '@/store/useCaseStore';
 import { connectionApi } from '@/api/connectionApi';
 import { generateConnectionId } from '@/utils/idGenerator';
+import { recordAuditLog } from '@/utils/auditHelper';
 import { CYBERPUNK_COLORS } from '@/utils/colorUtils';
 
 export const Canvas: React.FC = () => {
@@ -92,6 +93,13 @@ export const Canvas: React.FC = () => {
                 lineStyle: 'solid',
                 createdAt: new Date().toISOString(),
               });
+
+              recordAuditLog(
+                'create_connection',
+                'connection',
+                `${drawingConnection.fromId}-${toId}`,
+                `创建关联: ${fromEvidence.content.slice(0, 20)} → ${toEvidence.content.slice(0, 20)}`
+              );
             }
           }
         }

@@ -1,16 +1,18 @@
 import React, { useCallback } from 'react';
-import { Trash2, Palette } from 'lucide-react';
+import { Trash2, Palette, UserCheck, Activity } from 'lucide-react';
 import { NeonInput } from '@/components/ui/NeonInput';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { TagEditor } from './TagEditor';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
+import { useCollaboratorStore } from '@/store/useCollaboratorStore';
 import {
   CYBERPUNK_COLORS,
   getGlowColor,
   IMPORTANCE_COLORS,
 } from '@/utils/colorUtils';
-import type { Evidence, ImportanceLevel } from '@/types';
+import { recordAuditLog } from '@/utils/auditHelper';
+import type { Evidence, ImportanceLevel, TaskStatus } from '@/types';
 
 interface EvidenceEditorProps {
   evidence: Evidence;
@@ -34,10 +36,18 @@ const colorOptions = [
   '#45b7d1',
 ];
 
+const statusOptions: Array<{ value: TaskStatus; label: string; color: string }> = [
+  { value: 'pending', label: '待处理', color: CYBERPUNK_COLORS.textSecondary },
+  { value: 'in_progress', label: '进行中', color: CYBERPUNK_COLORS.accentCyan },
+  { value: 'completed', label: '已完成', color: CYBERPUNK_COLORS.accentGreen },
+  { value: 'reviewed', label: '已审核', color: CYBERPUNK_COLORS.accentPurple },
+];
+
 export const EvidenceEditor: React.FC<EvidenceEditorProps> = ({ evidence }) => {
   const updateEvidence = useEvidenceStore((state) => state.updateEvidence);
   const deleteEvidence = useEvidenceStore((state) => state.deleteEvidence);
   const setSelectedId = useCanvasStore((state) => state.setSelectedId);
+  const collaborators = useCollaboratorStore((state) => state.collaborators);
 
   const handleFieldChange = useCallback(
     (field: keyof Evidence, value: string | number | string[]) => {
@@ -137,6 +147,81 @@ export const EvidenceEditor: React.FC<EvidenceEditorProps> = ({ evidence }) => {
       </div>
 
       <TagEditor tags={evidence.tags} onTagsChange={handleTagsChange} />
+
+      <div className="space-y-2">
+        <label
+          className="block text-xs font-mono uppercase tracking-wider flex items-center gap-2"
+          style={{ color: CYBERPUNK_COLORS.textSecondary }}
+        >
+          <UserCheck size={14} />
+          负责人
+        </label>
+        <select
+          value={evidence.assignedTo || ''}
+          onChange={(e) => {
+            const value = e.target.value || null;
+            updateEvidence(evidence.id, { assignedTo: value });
+            const collaborator = value ? collaborators.find((c) => c.id === value) : null;
+            recordAuditLog(
+              'assign_evidence',
+              'evidence',
+              evidence.id,
+              collaborator ? `分配给 ${collaborator.name}` : '取消分配'
+            );
+          }}
+          className="w-full px-3 py-2 text-sm font-mono border rounded-sm focus:outline-none"
+          style={{
+            backgroundColor: CYBERPUNK_COLORS.bgSecondary,
+            borderColor: CYBERPUNK_COLORS.borderColor,
+            color: CYBERPUNK_COLORS.textPrimary,
+          }}
+        >
+          <option value="">未分配</option>
+          {collaborators.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <label
+          className="block text-xs font-mono uppercase tracking-wider flex items-center gap-2"
+          style={{ color: CYBERPUNK_COLORS.textSecondary }}
+        >
+          <Activity size={14} />
+          处理状态
+        </label>
+        <div className="flex gap-2">
+          {statusOptions.map((option) => {
+            const isActive = evidence.status === option.value;
+            return (
+              <button
+                key={option.value}
+                className="flex-1 px-2 py-1.5 text-xs font-mono border rounded-sm transition-all"
+                style={{
+                  borderColor: isActive ? option.color : CYBERPUNK_COLORS.borderColor,
+                  color: isActive ? option.color : CYBERPUNK_COLORS.textSecondary,
+                  backgroundColor: isActive ? getGlowColor(option.color, 0.1) : 'transparent',
+                  boxShadow: isActive ? `0 0 10px ${getGlowColor(option.color, 0.4)}` : 'none',
+                }}
+                onClick={() => {
+                  updateEvidence(evidence.id, { status: option.value });
+                  recordAuditLog(
+                    'change_status',
+                    'evidence',
+                    evidence.id,
+                    `状态变更为 ${option.label}`
+                  );
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-2 pt-4 border-t" style={{ borderColor: CYBERPUNK_COLORS.borderColor }}>
         <div>

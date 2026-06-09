@@ -2,8 +2,23 @@ import React from 'react';
 import { FileText } from 'lucide-react';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { GlowBorder } from '@/components/ui/GlowBorder';
+import { useCollaboratorStore } from '@/store/useCollaboratorStore';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
-import type { Evidence } from '@/types';
+import type { Evidence, TaskStatus } from '@/types';
+
+const STATUS_LABELS: Record<TaskStatus, string> = {
+  pending: '待处理',
+  in_progress: '进行中',
+  completed: '已完成',
+  reviewed: '已审核',
+};
+
+const STATUS_COLORS: Record<TaskStatus, string> = {
+  pending: CYBERPUNK_COLORS.textSecondary,
+  in_progress: CYBERPUNK_COLORS.accentCyan,
+  completed: CYBERPUNK_COLORS.accentGreen,
+  reviewed: CYBERPUNK_COLORS.accentPurple,
+};
 
 interface EvidenceListItemProps {
   evidence: Evidence;
@@ -20,6 +35,10 @@ export const EvidenceListItem: React.FC<EvidenceListItemProps> = ({
   onClick,
   isSelected,
 }) => {
+  const getCollaboratorById = useCollaboratorStore((s) => s.getCollaboratorById);
+  const assignedCollaborator = evidence.assignedTo ? getCollaboratorById(evidence.assignedTo) : null;
+  const statusColor = STATUS_COLORS[evidence.status];
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('zh-CN', {
       month: '2-digit',
@@ -112,6 +131,45 @@ export const EvidenceListItem: React.FC<EvidenceListItemProps> = ({
                   style={{ color: CYBERPUNK_COLORS.textSecondary }}
                 >
                   {formatDate(evidence.timestamp)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between mt-2">
+                {assignedCollaborator ? (
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-mono flex-shrink-0"
+                      style={{
+                        backgroundColor: getGlowColor(assignedCollaborator.color, 0.2),
+                        color: assignedCollaborator.color,
+                        fontSize: 8,
+                      }}
+                    >
+                      {assignedCollaborator.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span
+                      className="text-xs font-mono truncate"
+                      style={{ color: CYBERPUNK_COLORS.textSecondary }}
+                    >
+                      {assignedCollaborator.name}
+                    </span>
+                  </div>
+                ) : (
+                  <span
+                    className="text-xs font-mono"
+                    style={{ color: CYBERPUNK_COLORS.textSecondary }}
+                  >
+                    未分配
+                  </span>
+                )}
+                <span
+                  className="px-1.5 py-0.5 text-xs font-mono rounded-sm"
+                  style={{
+                    backgroundColor: getGlowColor(statusColor, 0.15),
+                    color: statusColor,
+                  }}
+                >
+                  {STATUS_LABELS[evidence.status]}
                 </span>
               </div>
             </div>

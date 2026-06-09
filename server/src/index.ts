@@ -3,6 +3,8 @@ import { registerCors } from './plugins/cors.js';
 import { caseRoutes } from './routes/caseRoutes.js';
 import { evidenceRoutes } from './routes/evidenceRoutes.js';
 import { connectionRoutes } from './routes/connectionRoutes.js';
+import { collaboratorRoutes } from './routes/collaboratorRoutes.js';
+import { auditLogRoutes } from './routes/auditLogRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { PersistenceService } from './services/PersistenceService.js';
 
@@ -18,6 +20,8 @@ server.register(healthRoutes, { prefix: '/api/health' });
 server.register(caseRoutes, { prefix: '/api/cases' });
 server.register(evidenceRoutes, { prefix: '/api/evidence' });
 server.register(connectionRoutes, { prefix: '/api/connections' });
+server.register(collaboratorRoutes, { prefix: '/api/collaborators' });
+server.register(auditLogRoutes, { prefix: '/api/audit-logs' });
 
 const start = async () => {
   try {

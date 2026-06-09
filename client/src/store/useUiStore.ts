@@ -6,27 +6,42 @@ interface UiState {
   sidebarOpen: boolean;
   propertyPanelOpen: boolean;
   caseSelectorOpen: boolean;
+  collaboratorPanelOpen: boolean;
+  timelinePanelOpen: boolean;
+  auditLogPanelOpen: boolean;
   saveStatus: SaveStatus;
   lastSaved: Date | null;
   currentTime: string;
+  currentCollaboratorId: string | null;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   togglePropertyPanel: () => void;
   setPropertyPanelOpen: (open: boolean) => void;
   toggleCaseSelector: () => void;
   setCaseSelectorOpen: (open: boolean) => void;
+  toggleCollaboratorPanel: () => void;
+  setCollaboratorPanelOpen: (open: boolean) => void;
+  toggleTimelinePanel: () => void;
+  setTimelinePanelOpen: (open: boolean) => void;
+  toggleAuditLogPanel: () => void;
+  setAuditLogPanelOpen: (open: boolean) => void;
   setSaveStatus: (status: SaveStatus) => void;
   updateLastSaved: () => void;
   updateCurrentTime: () => void;
+  setCurrentCollaboratorId: (id: string | null) => void;
 }
 
-export const useUiStore = create<UiState>((set, get) => ({
+export const useUiStore = create<UiState>((set) => ({
   sidebarOpen: true,
   propertyPanelOpen: true,
   caseSelectorOpen: false,
+  collaboratorPanelOpen: false,
+  timelinePanelOpen: false,
+  auditLogPanelOpen: false,
   saveStatus: 'idle',
   lastSaved: null,
   currentTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+  currentCollaboratorId: null,
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -37,6 +52,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   toggleCaseSelector: () => set((state) => ({ caseSelectorOpen: !state.caseSelectorOpen })),
   setCaseSelectorOpen: (open) => set({ caseSelectorOpen: open }),
 
+  toggleCollaboratorPanel: () => set((state) => ({ collaboratorPanelOpen: !state.collaboratorPanelOpen })),
+  setCollaboratorPanelOpen: (open) => set({ collaboratorPanelOpen: open }),
+
+  toggleTimelinePanel: () => set((state) => ({ timelinePanelOpen: !state.timelinePanelOpen })),
+  setTimelinePanelOpen: (open) => set({ timelinePanelOpen: open }),
+
+  toggleAuditLogPanel: () => set((state) => ({ auditLogPanelOpen: !state.auditLogPanelOpen })),
+  setAuditLogPanelOpen: (open) => set({ auditLogPanelOpen: open }),
+
   setSaveStatus: (status) => set({ saveStatus: status }),
 
   updateLastSaved: () => set({ lastSaved: new Date() }),
@@ -46,4 +70,6 @@ export const useUiStore = create<UiState>((set, get) => ({
       currentTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
     });
   },
+
+  setCurrentCollaboratorId: (id) => set({ currentCollaboratorId: id }),
 }));

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { evidenceApi } from '@/api/evidenceApi';
+import { recordAuditLog } from '@/utils/auditHelper';
 import type { Evidence, UpdateEvidenceDto, CreateEvidenceDto } from '@/types';
 
 interface EvidenceState {
@@ -41,6 +42,7 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
         set((state) => ({
           evidence: { ...state.evidence, [response.data!.id]: response.data! },
         }));
+        recordAuditLog('create_evidence', 'evidence', response.data.id, `创建证据: ${response.data.content.slice(0, 40)}`);
         return response.data;
       }
       set({ error: response.error || 'Failed to add evidence' });
@@ -61,6 +63,7 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
         set((state) => ({
           evidence: { ...state.evidence, [id]: response.data! },
         }));
+        recordAuditLog('update_evidence', 'evidence', id, `更新证据: ${response.data.content.slice(0, 40)}`);
       } else {
         set({ error: response.error || 'Failed to update evidence' });
       }
@@ -87,6 +90,8 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
   deleteEvidence: async (id) => {
     set({ loading: true, error: null });
     try {
+      const existing = get().evidence[id];
+      const contentPreview = existing?.content.slice(0, 40) || id;
       const response = await evidenceApi.delete(id);
       if (response.success) {
         set((state) => {
@@ -94,6 +99,7 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
           delete newEvidence[id];
           return { evidence: newEvidence };
         });
+        recordAuditLog('delete_evidence', 'evidence', id, `删除证据: ${contentPreview}`);
       } else {
         set({ error: response.error || 'Failed to delete evidence' });
       }

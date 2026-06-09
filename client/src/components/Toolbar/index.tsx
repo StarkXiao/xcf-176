@@ -10,6 +10,8 @@ import {
   FolderOpen,
   PanelLeft,
   PanelRight,
+  Users,
+  ScrollText,
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -28,8 +30,14 @@ export const Toolbar: React.FC = () => {
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
   const togglePropertyPanel = useUiStore((state) => state.togglePropertyPanel);
   const toggleCaseSelector = useUiStore((state) => state.toggleCaseSelector);
+  const toggleCollaboratorPanel = useUiStore((state) => state.toggleCollaboratorPanel);
+  const toggleTimelinePanel = useUiStore((state) => state.toggleTimelinePanel);
+  const toggleAuditLogPanel = useUiStore((state) => state.toggleAuditLogPanel);
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const propertyPanelOpen = useUiStore((state) => state.propertyPanelOpen);
+  const collaboratorPanelOpen = useUiStore((state) => state.collaboratorPanelOpen);
+  const timelinePanelOpen = useUiStore((state) => state.timelinePanelOpen);
+  const auditLogPanelOpen = useUiStore((state) => state.auditLogPanelOpen);
   const { forceSave } = useDebouncedSave();
 
   useEffect(() => {
@@ -198,6 +206,27 @@ export const Toolbar: React.FC = () => {
           icon={<PanelLeft size={16} />}
           onClick={toggleSidebar}
           glow={sidebarOpen}
+        />
+        <NeonButton
+          size="sm"
+          variant="primary"
+          icon={<Users size={16} />}
+          onClick={toggleCollaboratorPanel}
+          glow={collaboratorPanelOpen}
+        />
+        <NeonButton
+          size="sm"
+          variant="primary"
+          icon={<Clock size={16} />}
+          onClick={toggleTimelinePanel}
+          glow={timelinePanelOpen}
+        />
+        <NeonButton
+          size="sm"
+          variant="primary"
+          icon={<ScrollText size={16} />}
+          onClick={toggleAuditLogPanel}
+          glow={auditLogPanelOpen}
         />
         <NeonButton
           size="sm"

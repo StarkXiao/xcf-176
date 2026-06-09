@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { Case, Evidence, Connection } from '@shared/types';
+import type { Case, Evidence, Connection, Collaborator } from '@shared/types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,6 +42,8 @@ const createTables = () => {
       height REAL NOT NULL DEFAULT 120,
       color TEXT DEFAULT '#3b82f6',
       timestamp TEXT,
+      assigned_to TEXT DEFAULT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
     );
@@ -60,11 +62,51 @@ const createTables = () => {
       FOREIGN KEY (to_evidence_id) REFERENCES evidence(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS collaborators (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'operator',
+      color TEXT NOT NULL DEFAULT '#00f0ff',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      collaborator_id TEXT NOT NULL,
+      collaborator_name TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      detail TEXT NOT NULL DEFAULT '',
+      snapshot TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_evidence_case_id ON evidence(case_id);
     CREATE INDEX IF NOT EXISTS idx_connections_case_id ON connections(case_id);
     CREATE INDEX IF NOT EXISTS idx_connections_from ON connections(from_evidence_id);
     CREATE INDEX IF NOT EXISTS idx_connections_to ON connections(to_evidence_id);
+    CREATE INDEX IF NOT EXISTS idx_collaborators_case_id ON collaborators(case_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_case_id ON audit_logs(case_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_collaborator_id ON audit_logs(collaborator_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
   `);
+};
+
+const runMigrations = () => {
+  const evidenceColumns = db.prepare("PRAGMA table_info(evidence)").all() as { name: string }[];
+  const columnNames = evidenceColumns.map(c => c.name);
+
+  if (!columnNames.includes('assigned_to')) {
+    db.exec('ALTER TABLE evidence ADD COLUMN assigned_to TEXT DEFAULT NULL');
+  }
+  if (!columnNames.includes('status')) {
+    db.exec("ALTER TABLE evidence ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
+  }
 };
 
 const seedData = () => {
@@ -89,8 +131,9 @@ const seedData = () => {
   const insertEvidence = db.prepare(`
     INSERT INTO evidence (
       id, case_id, content, source, importance, tags,
-      position_x, position_y, width, height, color, timestamp, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      position_x, position_y, width, height, color, timestamp,
+      assigned_to, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const evidences: Omit<Evidence, 'createdAt'>[] = [
@@ -107,6 +150,8 @@ const seedData = () => {
       height: 180,
       color: '#ef4444',
       timestamp: '2024-06-10T14:32:00Z',
+      assignedTo: 'col-002',
+      status: 'reviewed',
     },
     {
       id: 'ev-002',
@@ -121,6 +166,8 @@ const seedData = () => {
       height: 180,
       color: '#dc2626',
       timestamp: '2024-06-12T09:15:00Z',
+      assignedTo: 'col-001',
+      status: 'completed',
     },
     {
       id: 'ev-003',
@@ -135,6 +182,8 @@ const seedData = () => {
       height: 180,
       color: '#dc2626',
       timestamp: '2024-06-15T16:48:00Z',
+      assignedTo: 'col-001',
+      status: 'in_progress',
     },
     {
       id: 'ev-004',
@@ -149,6 +198,8 @@ const seedData = () => {
       height: 160,
       color: '#dc2626',
       timestamp: '2024-06-16T10:22:00Z',
+      assignedTo: 'col-002',
+      status: 'reviewed',
     },
     {
       id: 'ev-005',
@@ -163,6 +214,8 @@ const seedData = () => {
       height: 180,
       color: '#ef4444',
       timestamp: '2024-06-18T23:05:00Z',
+      assignedTo: 'col-003',
+      status: 'in_progress',
     },
     {
       id: 'ev-006',
@@ -177,6 +230,8 @@ const seedData = () => {
       height: 180,
       color: '#ef4444',
       timestamp: '2024-06-20T08:30:00Z',
+      assignedTo: null,
+      status: 'pending',
     },
     {
       id: 'ev-007',
@@ -191,6 +246,8 @@ const seedData = () => {
       height: 160,
       color: '#f59e0b',
       timestamp: '2024-06-25T00:00:00Z',
+      assignedTo: 'col-002',
+      status: 'completed',
     },
     {
       id: 'ev-008',
@@ -205,6 +262,8 @@ const seedData = () => {
       height: 160,
       color: '#dc2626',
       timestamp: '2024-06-21T15:42:00Z',
+      assignedTo: 'col-001',
+      status: 'reviewed',
     },
     {
       id: 'ev-009',
@@ -219,6 +278,8 @@ const seedData = () => {
       height: 180,
       color: '#dc2626',
       timestamp: '2024-06-28T00:00:00Z',
+      assignedTo: 'col-004',
+      status: 'in_progress',
     },
   ];
 
@@ -236,6 +297,8 @@ const seedData = () => {
       ev.height,
       ev.color,
       ev.timestamp,
+      ev.assignedTo ?? null,
+      ev.status,
       now
     );
   }
@@ -343,9 +406,51 @@ const seedData = () => {
       now
     );
   }
+
+  const insertCollaborator = db.prepare(`
+    INSERT INTO collaborators (id, case_id, name, role, color, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  const collaborators: { id: string; name: string; role: string; color: string }[] = [
+    { id: 'col-001', name: '张队长', role: 'leader', color: '#00f0ff' },
+    { id: 'col-002', name: '李分析员', role: 'analyst', color: '#9945ff' },
+    { id: 'col-003', name: '王操作员', role: 'operator', color: '#00ff88' },
+    { id: 'col-004', name: '赵审核员', role: 'reviewer', color: '#ffcc00' },
+  ];
+
+  for (const c of collaborators) {
+    insertCollaborator.run(c.id, caseId, c.name, c.role, c.color, now);
+  }
+
+  const insertAuditLog = db.prepare(`
+    INSERT INTO audit_logs (id, case_id, collaborator_id, collaborator_name, action, target_type, target_id, detail, snapshot, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const auditLogs: { id: string; collaboratorId: string; collaboratorName: string; action: string; targetType: string; targetId: string; detail: string; snapshot: string | null; createdAt: string }[] = [
+    { id: 'log-001', collaboratorId: 'col-001', collaboratorName: '张队长', action: 'create_evidence', targetType: 'evidence', targetId: 'ev-001', detail: '创建证据: 微信聊天记录', snapshot: null, createdAt: '2024-06-10T14:35:00Z' },
+    { id: 'log-002', collaboratorId: 'col-002', collaboratorName: '李分析员', action: 'create_evidence', targetType: 'evidence', targetId: 'ev-002', detail: '创建证据: Telegram聊天记录', snapshot: null, createdAt: '2024-06-12T09:20:00Z' },
+    { id: 'log-003', collaboratorId: 'col-001', collaboratorName: '张队长', action: 'create_connection', targetType: 'connection', targetId: 'conn-001', detail: '创建关系: 诱导注册', snapshot: null, createdAt: '2024-06-12T10:00:00Z' },
+    { id: 'log-004', collaboratorId: 'col-001', collaboratorName: '张队长', action: 'create_evidence', targetType: 'evidence', targetId: 'ev-003', detail: '创建证据: 微信聊天记录-收益诱惑', snapshot: null, createdAt: '2024-06-15T17:00:00Z' },
+    { id: 'log-005', collaboratorId: 'col-002', collaboratorName: '李分析员', action: 'create_evidence', targetType: 'evidence', targetId: 'ev-004', detail: '创建证据: 银行转账记录-500万', snapshot: null, createdAt: '2024-06-16T10:30:00Z' },
+    { id: 'log-006', collaboratorId: 'col-003', collaboratorName: '王操作员', action: 'create_connection', targetType: 'connection', targetId: 'conn-003', detail: '创建关系: 500万转账', snapshot: null, createdAt: '2024-06-16T11:00:00Z' },
+    { id: 'log-007', collaboratorId: 'col-002', collaboratorName: '李分析员', action: 'create_evidence', targetType: 'evidence', targetId: 'ev-005', detail: '创建证据: Telegram聊天记录-账户冻结', snapshot: null, createdAt: '2024-06-18T23:10:00Z' },
+    { id: 'log-008', collaboratorId: 'col-001', collaboratorName: '张队长', action: 'create_evidence', targetType: 'evidence', targetId: 'ev-006', detail: '创建证据: 微信聊天记录-团伙配合', snapshot: null, createdAt: '2024-06-20T08:35:00Z' },
+    { id: 'log-009', collaboratorId: 'col-002', collaboratorName: '李分析员', action: 'create_evidence', targetType: 'evidence', targetId: 'ev-007', detail: '创建证据: IP地址分析报告', snapshot: null, createdAt: '2024-06-25T00:10:00Z' },
+    { id: 'log-010', collaboratorId: 'col-001', collaboratorName: '张队长', action: 'create_evidence', targetType: 'evidence', targetId: 'ev-008', detail: '创建证据: 通话录音-嫌疑人承认', snapshot: null, createdAt: '2024-06-21T15:50:00Z' },
+    { id: 'log-011', collaboratorId: 'col-002', collaboratorName: '李分析员', action: 'create_evidence', targetType: 'evidence', targetId: 'ev-009', detail: '创建证据: 资金流向分析', snapshot: null, createdAt: '2024-06-28T00:10:00Z' },
+    { id: 'log-012', collaboratorId: 'col-001', collaboratorName: '张队长', action: 'assign_evidence', targetType: 'evidence', targetId: 'ev-004', detail: '将证据分配给李分析员', snapshot: null, createdAt: '2024-06-16T11:30:00Z' },
+    { id: 'log-013', collaboratorId: 'col-004', collaboratorName: '赵审核员', action: 'change_status', targetType: 'evidence', targetId: 'ev-008', detail: '状态变更: in_progress -> reviewed', snapshot: null, createdAt: '2024-06-22T09:00:00Z' },
+  ];
+
+  for (const l of auditLogs) {
+    insertAuditLog.run(l.id, caseId, l.collaboratorId, l.collaboratorName, l.action, l.targetType, l.targetId, l.detail, l.snapshot, l.createdAt);
+  }
 };
 
 createTables();
+runMigrations();
 seedData();
 
 export default db;

@@ -1,6 +1,7 @@
 import { CaseRepository } from '../repositories/CaseRepository.js';
 import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
+import { CollaboratorRepository } from '../repositories/CollaboratorRepository.js';
 import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto } from '@shared/types';
 
 export const CaseService = {
@@ -18,11 +19,13 @@ export const CaseService = {
 
     const evidence = EvidenceRepository.findByCaseId(id);
     const connections = ConnectionRepository.findByCaseId(id);
+    const collaborators = CollaboratorRepository.findByCaseId(id);
 
     return {
       ...caseData,
       evidence,
       connections,
+      collaborators,
     };
   },
 
