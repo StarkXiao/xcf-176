@@ -66,6 +66,116 @@ export interface Collaborator {
   createdAt: string;
 }
 
+export type ConsultationStatus = 'open' | 'in_progress' | 'concluded' | 'cancelled';
+
+export interface Consultation {
+  id: string;
+  caseId: string;
+  title: string;
+  description: string;
+  status: ConsultationStatus;
+  initiatedBy: string;
+  evidenceIds: string[];
+  keyClues: string[];
+  concludedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConsultationDiscussion {
+  id: string;
+  consultationId: string;
+  collaboratorId: string;
+  collaboratorName: string;
+  evidenceId?: string;
+  content: string;
+  isDispute: boolean;
+  createdAt: string;
+}
+
+export interface ConsultationConclusion {
+  id: string;
+  consultationId: string;
+  content: string;
+  decidedBy: string;
+  decidedByName: string;
+  caseStatusUpdate?: TaskStatus;
+  keyCluesUpdate?: string[];
+  createdAt: string;
+}
+
+export interface ConsultationDispute {
+  id: string;
+  consultationId: string;
+  discussionId: string;
+  evidenceId?: string;
+  description: string;
+  raisedBy: string;
+  raisedByName: string;
+  resolution?: string;
+  resolvedBy?: string;
+  resolvedByName?: string;
+  resolvedAt?: string;
+  createdAt: string;
+}
+
+export interface CreateConsultationDto {
+  caseId: string;
+  title: string;
+  description?: string;
+  initiatedBy: string;
+  evidenceIds?: string[];
+  keyClues?: string[];
+}
+
+export interface UpdateConsultationDto {
+  title?: string;
+  description?: string;
+  status?: ConsultationStatus;
+  evidenceIds?: string[];
+  keyClues?: string[];
+  concludedAt?: string;
+}
+
+export interface CreateDiscussionDto {
+  consultationId: string;
+  collaboratorId: string;
+  collaboratorName: string;
+  evidenceId?: string;
+  content: string;
+  isDispute?: boolean;
+}
+
+export interface CreateConclusionDto {
+  consultationId: string;
+  content: string;
+  decidedBy: string;
+  decidedByName: string;
+  caseStatusUpdate?: TaskStatus;
+  keyCluesUpdate?: string[];
+}
+
+export interface CreateDisputeDto {
+  consultationId: string;
+  discussionId: string;
+  evidenceId?: string;
+  description: string;
+  raisedBy: string;
+  raisedByName: string;
+}
+
+export interface ResolveDisputeDto {
+  resolution: string;
+  resolvedBy: string;
+  resolvedByName: string;
+}
+
+export interface ConsultationWithDetails extends Consultation {
+  discussions: ConsultationDiscussion[];
+  conclusions: ConsultationConclusion[];
+  disputes: ConsultationDispute[];
+}
+
 export type AuditAction =
   | 'create_evidence'
   | 'update_evidence'
@@ -81,7 +191,13 @@ export type AuditAction =
   | 'create_case'
   | 'update_case'
   | 'delete_case'
-  | 'restore_snapshot';
+  | 'restore_snapshot'
+  | 'create_consultation'
+  | 'update_consultation'
+  | 'add_discussion'
+  | 'add_conclusion'
+  | 'raise_dispute'
+  | 'resolve_dispute';
 
 export interface AuditLog {
   id: string;

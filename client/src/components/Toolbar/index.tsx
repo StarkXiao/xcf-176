@@ -13,6 +13,7 @@ import {
   Users,
   ScrollText,
   ShieldCheck,
+  MessageSquare,
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -36,12 +37,14 @@ export const Toolbar: React.FC = () => {
   const toggleTimelinePanel = useUiStore((state) => state.toggleTimelinePanel);
   const toggleAuditLogPanel = useUiStore((state) => state.toggleAuditLogPanel);
   const toggleEvidenceCollectionPanel = useUiStore((state) => state.toggleEvidenceCollectionPanel);
+  const toggleConsultationPanel = useUiStore((state) => state.toggleConsultationPanel);
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const propertyPanelOpen = useUiStore((state) => state.propertyPanelOpen);
   const collaboratorPanelOpen = useUiStore((state) => state.collaboratorPanelOpen);
   const timelinePanelOpen = useUiStore((state) => state.timelinePanelOpen);
   const auditLogPanelOpen = useUiStore((state) => state.auditLogPanelOpen);
   const evidenceCollectionPanelOpen = useUiStore((state) => state.evidenceCollectionPanelOpen);
+  const consultationPanelOpen = useUiStore((state) => state.consultationPanelOpen);
   const { forceSave } = useDebouncedSave();
 
   useEffect(() => {
@@ -245,6 +248,13 @@ export const Toolbar: React.FC = () => {
           icon={<ShieldCheck size={16} />}
           onClick={toggleEvidenceCollectionPanel}
           glow={evidenceCollectionPanelOpen}
+        />
+        <NeonButton
+          size="sm"
+          variant="warning"
+          icon={<MessageSquare size={16} />}
+          onClick={toggleConsultationPanel}
+          glow={consultationPanelOpen}
         />
         <NeonButton
           size="sm"

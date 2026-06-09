@@ -10,6 +10,7 @@ interface UiState {
   timelinePanelOpen: boolean;
   auditLogPanelOpen: boolean;
   evidenceCollectionPanelOpen: boolean;
+  consultationPanelOpen: boolean;
   saveStatus: SaveStatus;
   lastSaved: Date | null;
   currentTime: string;
@@ -28,6 +29,8 @@ interface UiState {
   setAuditLogPanelOpen: (open: boolean) => void;
   toggleEvidenceCollectionPanel: () => void;
   setEvidenceCollectionPanelOpen: (open: boolean) => void;
+  toggleConsultationPanel: () => void;
+  setConsultationPanelOpen: (open: boolean) => void;
   setSaveStatus: (status: SaveStatus) => void;
   updateLastSaved: () => void;
   updateCurrentTime: () => void;
@@ -42,6 +45,7 @@ export const useUiStore = create<UiState>((set) => ({
   timelinePanelOpen: false,
   auditLogPanelOpen: false,
   evidenceCollectionPanelOpen: false,
+  consultationPanelOpen: false,
   saveStatus: 'idle',
   lastSaved: null,
   currentTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
@@ -67,6 +71,9 @@ export const useUiStore = create<UiState>((set) => ({
 
   toggleEvidenceCollectionPanel: () => set((state) => ({ evidenceCollectionPanelOpen: !state.evidenceCollectionPanelOpen })),
   setEvidenceCollectionPanelOpen: (open) => set({ evidenceCollectionPanelOpen: open }),
+
+  toggleConsultationPanel: () => set((state) => ({ consultationPanelOpen: !state.consultationPanelOpen })),
+  setConsultationPanelOpen: (open) => set({ consultationPanelOpen: open }),
 
   setSaveStatus: (status) => set({ saveStatus: status }),
 

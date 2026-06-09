@@ -31,6 +31,12 @@ const ACTION_LABELS: { [key in AuditAction]: string } = {
   update_case: '更新案件',
   delete_case: '删除案件',
   restore_snapshot: '恢复快照',
+  create_consultation: '发起会商',
+  update_consultation: '更新会商',
+  add_discussion: '添加讨论',
+  add_conclusion: '形成结论',
+  raise_dispute: '提出争议',
+  resolve_dispute: '解决争议',
 };
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {
