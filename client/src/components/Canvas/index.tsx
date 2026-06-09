@@ -11,7 +11,7 @@ import { useCanvasStore } from '@/store/useCanvasStore';
 import { useCaseStore } from '@/store/useCaseStore';
 import { connectionApi } from '@/api/connectionApi';
 import { generateConnectionId } from '@/utils/idGenerator';
-import { recordAuditLog } from '@/utils/auditHelper';
+import { recordAuditLog, captureConnectionSnapshot } from '@/utils/auditHelper';
 import { CYBERPUNK_COLORS } from '@/utils/colorUtils';
 
 export const Canvas: React.FC = () => {
@@ -74,6 +74,17 @@ export const Canvas: React.FC = () => {
             const toEvidence = getEvidenceById(toId);
 
             if (fromEvidence && toEvidence) {
+              const newConnection = {
+                id: generateConnectionId(),
+                caseId: currentCase.id,
+                fromEvidenceId: drawingConnection.fromId,
+                toEvidenceId: toId,
+                label: '',
+                color: CYBERPUNK_COLORS.accentCyan,
+                lineStyle: 'solid' as const,
+                createdAt: new Date().toISOString(),
+              };
+
               connectionApi.create({
                 caseId: currentCase.id,
                 fromEvidenceId: drawingConnection.fromId,
@@ -83,22 +94,15 @@ export const Canvas: React.FC = () => {
                 lineStyle: 'solid',
               });
 
-              addConnection({
-                id: generateConnectionId(),
-                caseId: currentCase.id,
-                fromEvidenceId: drawingConnection.fromId,
-                toEvidenceId: toId,
-                label: '',
-                color: CYBERPUNK_COLORS.accentCyan,
-                lineStyle: 'solid',
-                createdAt: new Date().toISOString(),
-              });
+              addConnection(newConnection);
 
+              const snapshot = captureConnectionSnapshot(newConnection);
               recordAuditLog(
                 'create_connection',
                 'connection',
-                `${drawingConnection.fromId}-${toId}`,
-                `创建关联: ${fromEvidence.content.slice(0, 20)} → ${toEvidence.content.slice(0, 20)}`
+                newConnection.id,
+                `创建关联: ${fromEvidence.content.slice(0, 20)} → ${toEvidence.content.slice(0, 20)}`,
+                snapshot
               );
             }
           }

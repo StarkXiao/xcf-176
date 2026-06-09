@@ -52,6 +52,14 @@ export const ConnectionRepository = {
 
   create: (dto: CreateConnectionDto): Connection => {
     const id = uuidv4();
+    return ConnectionRepository._insert(id, dto);
+  },
+
+  createWithId: (id: string, dto: CreateConnectionDto): Connection => {
+    return ConnectionRepository._insert(id, dto);
+  },
+
+  _insert: (id: string, dto: CreateConnectionDto): Connection => {
     const now = new Date().toISOString();
     const stmt = db.prepare(`
       INSERT INTO connections (

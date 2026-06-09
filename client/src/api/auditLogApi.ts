@@ -1,7 +1,7 @@
 import { request } from './client';
 import type { AuditLog, CreateAuditLogDto, TimelineEntry, Evidence, Connection, ApiResponse } from '@/types';
 
-type RestoreResult = { evidence?: Evidence; connection?: Connection };
+type RestoreResult = { evidence?: Evidence; connection?: Connection; recreated?: boolean };
 
 export const auditLogApi = {
   async getByCaseId(caseId: string): Promise<ApiResponse<AuditLog[]>> {

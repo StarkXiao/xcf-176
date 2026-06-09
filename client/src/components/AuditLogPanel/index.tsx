@@ -125,18 +125,25 @@ export const AuditLogPanel: React.FC = () => {
     try {
       const response = await auditLogApi.restoreFromSnapshot(auditLogId);
       if (response.success && response.data) {
-        const { evidence: restoredEvidence, connection: restoredConnection } = response.data;
+        const { evidence: restoredEvidence, connection: restoredConnection, recreated } = response.data;
         if (restoredEvidence) {
-          useEvidenceStore.getState().setEvidence([
-            ...useEvidenceStore.getState().getEvidenceArray().map((e) =>
-              e.id === restoredEvidence.id ? restoredEvidence : e
-            ),
-          ]);
-          recordAuditLog('restore_snapshot', 'evidence', restoredEvidence.id, `恢复证据快照: ${restoredEvidence.content.slice(0, 30)}`);
+          const existingArr = useEvidenceStore.getState().getEvidenceArray();
+          if (recreated) {
+            useEvidenceStore.getState().setEvidence([...existingArr, restoredEvidence]);
+          } else {
+            useEvidenceStore.getState().setEvidence(
+              existingArr.map((e) => (e.id === restoredEvidence.id ? restoredEvidence : e))
+            );
+          }
+          recordAuditLog('restore_snapshot', 'evidence', restoredEvidence.id, `${recreated ? '重建' : '恢复'}证据快照: ${restoredEvidence.content.slice(0, 30)}`);
         }
         if (restoredConnection) {
-          useCanvasStore.getState().updateConnection(restoredConnection);
-          recordAuditLog('restore_snapshot', 'connection', restoredConnection.id, `恢复关联快照: ${restoredConnection.label || '关系连线'}`);
+          if (recreated) {
+            useCanvasStore.getState().addConnection(restoredConnection);
+          } else {
+            useCanvasStore.getState().updateConnection(restoredConnection);
+          }
+          recordAuditLog('restore_snapshot', 'connection', restoredConnection.id, `${recreated ? '重建' : '恢复'}关联快照: ${restoredConnection.label || '关系连线'}`);
         }
         if (currentCase) {
           loadAuditLogs(currentCase.id);
@@ -146,6 +153,16 @@ export const AuditLogPanel: React.FC = () => {
     } catch (error) {
       console.error('Restore failed:', error);
     }
+  };
+
+  const isTargetDeleted = (log: AuditLog): boolean => {
+    if (log.targetType === 'evidence') {
+      return !useEvidenceStore.getState().getEvidenceById(log.targetId);
+    }
+    if (log.targetType === 'connection') {
+      return !useCanvasStore.getState().connections.find((c) => c.id === log.targetId);
+    }
+    return false;
   };
 
   return (
@@ -255,6 +272,7 @@ export const AuditLogPanel: React.FC = () => {
           const isExpanded = expandedId === log.id;
           const hasSnapshot = !!log.snapshot;
           const canRestore = (log.targetType === 'evidence' || log.targetType === 'connection') && hasSnapshot;
+          const targetDeleted = isTargetDeleted(log);
 
           return (
             <div
@@ -290,6 +308,18 @@ export const AuditLogPanel: React.FC = () => {
                     >
                       {ACTION_LABELS[log.action] || log.action}
                     </span>
+                    {targetDeleted && (
+                      <span
+                        className="text-xs font-mono px-1 py-0 rounded-sm"
+                        style={{
+                          color: CYBERPUNK_COLORS.accentRed,
+                          backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentRed, 0.1),
+                          border: `1px solid ${CYBERPUNK_COLORS.accentRed}`,
+                        }}
+                      >
+                        已删除
+                      </span>
+                    )}
                     <span
                       className="text-xs font-mono truncate flex-1"
                       style={{ color: CYBERPUNK_COLORS.textPrimary }}
@@ -331,15 +361,17 @@ export const AuditLogPanel: React.FC = () => {
                       <button
                         className="flex items-center gap-1 px-1.5 py-0.5 text-xs font-mono rounded-sm border transition-all"
                         style={{
-                          borderColor: CYBERPUNK_COLORS.accentCyan,
-                          color: CYBERPUNK_COLORS.accentCyan,
-                          backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.08),
+                          borderColor: targetDeleted ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan,
+                          color: targetDeleted ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan,
+                          backgroundColor: targetDeleted
+                            ? getGlowColor(CYBERPUNK_COLORS.accentRed, 0.08)
+                            : getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.08),
                         }}
                         onClick={() => setViewingLog(log)}
-                        title="恢复到此状态"
+                        title={targetDeleted ? '从快照重建' : '恢复到此状态'}
                       >
                         <RotateCcw size={10} />
-                        恢复
+                        {targetDeleted ? '重建' : '恢复'}
                       </button>
                     )}
                     {hasSnapshot && !canRestore && (
@@ -375,6 +407,7 @@ export const AuditLogPanel: React.FC = () => {
       {viewingLog && (
         <SnapshotViewer
           log={viewingLog}
+          isDeleted={isTargetDeleted(viewingLog)}
           onRestore={handleRestore}
           onClose={() => setViewingLog(null)}
         />

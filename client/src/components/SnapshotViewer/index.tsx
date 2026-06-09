@@ -1,15 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { X, RotateCcw, AlertTriangle } from 'lucide-react';
+import { X, RotateCcw, AlertTriangle, ArchiveRestore } from 'lucide-react';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
 import type { AuditLog } from '@/types';
 
 interface SnapshotViewerProps {
   log: AuditLog;
+  isDeleted?: boolean;
   onRestore: (auditLogId: string) => Promise<void>;
   onClose: () => void;
 }
 
 const FIELD_LABELS: Record<string, string> = {
+  id: 'ID',
+  caseId: '案件ID',
   content: '内容',
   source: '来源',
   importance: '重要性',
@@ -22,7 +25,9 @@ const FIELD_LABELS: Record<string, string> = {
   timestamp: '时间戳',
   assignedTo: '分配给',
   status: '状态',
-  label: '标签',
+  fromEvidenceId: '起点证据',
+  toEvidenceId: '终点证据',
+  label: '标签名',
   lineStyle: '线型',
 };
 
@@ -46,7 +51,9 @@ const LINE_STYLE_MAP: Record<string, string> = {
   dotted: '点线',
 };
 
-export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, onClose }) => {
+const HIDDEN_FIELDS = new Set(['id', 'caseId']);
+
+export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, isDeleted, onRestore, onClose }) => {
   const [restoring, setRestoring] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
 
@@ -59,7 +66,7 @@ export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, 
     }
   }, [log.snapshot]);
 
-  const canRestore = log.targetType === 'evidence' || log.targetType === 'connection';
+  const canRestore = (log.targetType === 'evidence' || log.targetType === 'connection') && !!snapshot;
 
   const handleRestore = async () => {
     if (!confirmRestore) {
@@ -82,8 +89,12 @@ export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, 
     if (key === 'status') return STATUS_MAP[String(value)] || String(value);
     if (key === 'lineStyle') return LINE_STYLE_MAP[String(value)] || String(value);
     if (key === 'tags') return Array.isArray(value) ? (value as string[]).join(', ') : String(value);
+    if (key === 'fromEvidenceId' || key === 'toEvidenceId') return String(value).slice(0, 8) + '...';
     return String(value);
   };
+
+  const restoreLabel = isDeleted ? '一键重建' : '一键恢复';
+  const confirmLabel = isDeleted ? '确认重建此已删除项？' : '确认恢复到此快照状态？';
 
   return (
     <div
@@ -95,8 +106,8 @@ export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, 
         className="w-[520px] max-h-[80vh] flex flex-col border rounded-sm"
         style={{
           backgroundColor: CYBERPUNK_COLORS.bgSecondary,
-          borderColor: CYBERPUNK_COLORS.accentCyan,
-          boxShadow: `0 0 20px ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.3)}`,
+          borderColor: isDeleted ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan,
+          boxShadow: `0 0 20px ${getGlowColor(isDeleted ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan, 0.3)}`,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -105,21 +116,31 @@ export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, 
           style={{ borderColor: CYBERPUNK_COLORS.borderColor }}
         >
           <div className="flex items-center gap-2">
-            <RotateCcw
-              size={16}
-              style={{
-                color: CYBERPUNK_COLORS.accentCyan,
-                filter: `drop-shadow(0 0 4px ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.6)})`,
-              }}
-            />
+            {isDeleted ? (
+              <ArchiveRestore
+                size={16}
+                style={{
+                  color: CYBERPUNK_COLORS.accentRed,
+                  filter: `drop-shadow(0 0 4px ${getGlowColor(CYBERPUNK_COLORS.accentRed, 0.6)})`,
+                }}
+              />
+            ) : (
+              <RotateCcw
+                size={16}
+                style={{
+                  color: CYBERPUNK_COLORS.accentCyan,
+                  filter: `drop-shadow(0 0 4px ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.6)})`,
+                }}
+              />
+            )}
             <span
               className="text-sm font-mono font-bold"
               style={{
-                color: CYBERPUNK_COLORS.accentCyan,
-                textShadow: `0 0 8px ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.6)}`,
+                color: isDeleted ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan,
+                textShadow: `0 0 8px ${getGlowColor(isDeleted ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan, 0.6)}`,
               }}
             >
-              快照回看
+              {isDeleted ? '已删除项 · 快照重建' : '快照回看'}
             </span>
           </div>
           <button
@@ -156,6 +177,20 @@ export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, 
               {new Date(log.createdAt).toLocaleString('zh-CN')}
             </span>
           </div>
+          {isDeleted && (
+            <div
+              className="flex items-center gap-1.5 px-2 py-1 rounded-sm"
+              style={{
+                backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentRed, 0.1),
+                border: `1px solid ${CYBERPUNK_COLORS.accentRed}`,
+              }}
+            >
+              <AlertTriangle size={12} style={{ color: CYBERPUNK_COLORS.accentRed }} />
+              <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.accentRed }}>
+                此{log.targetType === 'evidence' ? '证据' : '关联'}已被删除，恢复将从快照重建
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -168,28 +203,30 @@ export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, 
                   backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentPurple, 0.08),
                 }}
               >
-                操作前状态快照
+                {isDeleted ? '完整快照（将用于重建）' : '操作前状态快照'}
               </div>
-              {Object.entries(snapshot).map(([key, value]) => (
-                <div
-                  key={key}
-                  className="flex items-start border-b py-1.5"
-                  style={{ borderColor: CYBERPUNK_COLORS.borderColor }}
-                >
-                  <span
-                    className="text-xs font-mono w-20 flex-shrink-0"
-                    style={{ color: CYBERPUNK_COLORS.textSecondary }}
+              {Object.entries(snapshot)
+                .filter(([key]) => !HIDDEN_FIELDS.has(key))
+                .map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex items-start border-b py-1.5"
+                    style={{ borderColor: CYBERPUNK_COLORS.borderColor }}
                   >
-                    {FIELD_LABELS[key] || key}
-                  </span>
-                  <span
-                    className="text-xs font-mono break-all"
-                    style={{ color: CYBERPUNK_COLORS.textPrimary }}
-                  >
-                    {formatValue(key, value)}
-                  </span>
-                </div>
-              ))}
+                    <span
+                      className="text-xs font-mono w-20 flex-shrink-0"
+                      style={{ color: CYBERPUNK_COLORS.textSecondary }}
+                    >
+                      {FIELD_LABELS[key] || key}
+                    </span>
+                    <span
+                      className="text-xs font-mono break-all"
+                      style={{ color: CYBERPUNK_COLORS.textPrimary }}
+                    >
+                      {formatValue(key, value)}
+                    </span>
+                  </div>
+                ))}
             </div>
           ) : (
             <div
@@ -201,7 +238,7 @@ export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, 
           )}
         </div>
 
-        {canRestore && snapshot && (
+        {canRestore && (
           <div
             className="px-4 py-3 border-t flex items-center justify-between"
             style={{ borderColor: CYBERPUNK_COLORS.borderColor }}
@@ -210,7 +247,7 @@ export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, 
               <div className="flex items-center gap-1.5">
                 <AlertTriangle size={14} style={{ color: CYBERPUNK_COLORS.accentYellow }} />
                 <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.accentYellow }}>
-                  确认恢复到此快照状态？
+                  {confirmLabel}
                 </span>
               </div>
             )}
@@ -231,20 +268,22 @@ export const SnapshotViewer: React.FC<SnapshotViewerProps> = ({ log, onRestore, 
               <button
                 className="px-3 py-1.5 text-xs font-mono rounded-sm border transition-all flex items-center gap-1.5"
                 style={{
-                  borderColor: confirmRestore ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan,
-                  color: confirmRestore ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan,
+                  borderColor: confirmRestore ? CYBERPUNK_COLORS.accentRed : isDeleted ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan,
+                  color: confirmRestore ? CYBERPUNK_COLORS.accentRed : isDeleted ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan,
                   backgroundColor: confirmRestore
                     ? getGlowColor(CYBERPUNK_COLORS.accentRed, 0.1)
+                    : isDeleted
+                    ? getGlowColor(CYBERPUNK_COLORS.accentRed, 0.1)
                     : getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.1),
-                  boxShadow: confirmRestore
+                  boxShadow: confirmRestore || isDeleted
                     ? `0 0 8px ${getGlowColor(CYBERPUNK_COLORS.accentRed, 0.3)}`
                     : `0 0 8px ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.3)}`,
                 }}
                 onClick={handleRestore}
                 disabled={restoring}
               >
-                <RotateCcw size={12} />
-                {restoring ? '恢复中...' : confirmRestore ? '确认恢复' : '一键恢复'}
+                {isDeleted ? <ArchiveRestore size={12} /> : <RotateCcw size={12} />}
+                {restoring ? (isDeleted ? '重建中...' : '恢复中...') : confirmRestore ? (isDeleted ? '确认重建' : '确认恢复') : restoreLabel}
               </button>
             </div>
           </div>

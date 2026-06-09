@@ -7,6 +7,8 @@ const DEFAULT_COLLABORATOR_ID = 'system';
 
 function buildEvidenceSnapshot(ev: Evidence): string {
   return JSON.stringify({
+    id: ev.id,
+    caseId: ev.caseId,
     content: ev.content,
     source: ev.source,
     importance: ev.importance,
@@ -24,6 +26,10 @@ function buildEvidenceSnapshot(ev: Evidence): string {
 
 function buildConnectionSnapshot(conn: Connection): string {
   return JSON.stringify({
+    id: conn.id,
+    caseId: conn.caseId,
+    fromEvidenceId: conn.fromEvidenceId,
+    toEvidenceId: conn.toEvidenceId,
     label: conn.label,
     color: conn.color,
     lineStyle: conn.lineStyle,

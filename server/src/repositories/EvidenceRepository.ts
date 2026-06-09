@@ -57,6 +57,14 @@ export const EvidenceRepository = {
 
   create: (dto: CreateEvidenceDto): Evidence => {
     const id = uuidv4();
+    return EvidenceRepository._insert(id, dto);
+  },
+
+  createWithId: (id: string, dto: CreateEvidenceDto): Evidence => {
+    return EvidenceRepository._insert(id, dto);
+  },
+
+  _insert: (id: string, dto: CreateEvidenceDto): Evidence => {
     const now = new Date().toISOString();
     const stmt = db.prepare(`
       INSERT INTO evidence (

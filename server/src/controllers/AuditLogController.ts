@@ -14,7 +14,7 @@ interface AuditLogIdParams {
   Params: { auditLogId: string };
 }
 
-type RestoreResult = { evidence?: Evidence; connection?: Connection };
+type RestoreResult = { evidence?: Evidence; connection?: Connection; recreated?: boolean };
 
 export const AuditLogController = {
   async getAuditLogsByCaseId(req: FastifyRequest<CaseIdParams>, reply: FastifyReply) {

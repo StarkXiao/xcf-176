@@ -2,6 +2,7 @@ import React from 'react';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { getNearestEdge, getLinePath, getLineMidpoint } from '@/utils/geometry';
+import { captureConnectionSnapshot, recordAuditLog } from '@/utils/auditHelper';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
 import type { Connection } from '@/types';
 
@@ -28,6 +29,22 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
   const handleConnectionClick = (e: React.MouseEvent, connectionId: string) => {
     e.stopPropagation();
     if (e.detail === 2) {
+      const conn = connections.find((c) => c.id === connectionId);
+      if (conn) {
+        const snapshot = captureConnectionSnapshot(conn);
+        const fromEv = getEvidenceById(conn.fromEvidenceId);
+        const toEv = getEvidenceById(conn.toEvidenceId);
+        const fromLabel = fromEv ? fromEv.content.slice(0, 15) : '?';
+        const toLabel = toEv ? toEv.content.slice(0, 15) : '?';
+
+        recordAuditLog(
+          'delete_connection',
+          'connection',
+          connectionId,
+          `删除关联: ${fromLabel} → ${toLabel}`,
+          snapshot
+        );
+      }
       removeConnection(connectionId);
     }
   };
