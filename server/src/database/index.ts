@@ -86,6 +86,27 @@ const createTables = () => {
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS evidence_collection (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      source_url TEXT,
+      file_name TEXT,
+      file_size INTEGER,
+      file_type TEXT,
+      screenshot_data_url TEXT,
+      content_hash TEXT NOT NULL,
+      importance TEXT NOT NULL DEFAULT 'normal',
+      tags TEXT DEFAULT '[]',
+      verification_status TEXT NOT NULL DEFAULT 'pending',
+      duplicate_of TEXT,
+      collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      archived_at TEXT,
+      archived_evidence_id TEXT,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_evidence_case_id ON evidence(case_id);
     CREATE INDEX IF NOT EXISTS idx_connections_case_id ON connections(case_id);
     CREATE INDEX IF NOT EXISTS idx_connections_from ON connections(from_evidence_id);
@@ -94,6 +115,9 @@ const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_audit_logs_case_id ON audit_logs(case_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_collaborator_id ON audit_logs(collaborator_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_evidence_collection_case_id ON evidence_collection(case_id);
+    CREATE INDEX IF NOT EXISTS idx_evidence_collection_content_hash ON evidence_collection(content_hash);
+    CREATE INDEX IF NOT EXISTS idx_evidence_collection_status ON evidence_collection(verification_status);
   `);
 };
 
