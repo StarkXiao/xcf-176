@@ -338,6 +338,35 @@ export interface CreateCollectionItemDto {
   tags?: string[];
 }
 
+export type TraceNodeKind = 'evidence' | 'collection' | 'audit';
+export type TraceEdgeKind = 'connection' | 'temporal' | 'source' | 'dedup';
+export type TracePerspective = 'timeline' | 'source' | 'relationship' | 'importance';
+
+export interface TraceNode {
+  id: string;
+  kind: TraceNodeKind;
+  label: string;
+  timestamp: string;
+  sourceType?: EvidenceSourceType;
+  importance?: Evidence['importance'];
+  referenceId: string;
+  tags: string[];
+  collaboratorName?: string;
+}
+
+export interface TraceEdge {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  label: string;
+  kind: TraceEdgeKind;
+}
+
+export interface TraceGraph {
+  nodes: TraceNode[];
+  edges: TraceEdge[];
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;

@@ -7,6 +7,7 @@ import { collaboratorRoutes } from './routes/collaboratorRoutes.js';
 import { auditLogRoutes } from './routes/auditLogRoutes.js';
 import { evidenceCollectionRoutes } from './routes/evidenceCollectionRoutes.js';
 import { consultationRoutes } from './routes/consultationRoutes.js';
+import { traceAnalysisRoutes } from './routes/traceAnalysisRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { PersistenceService } from './services/PersistenceService.js';
 
@@ -26,6 +27,7 @@ server.register(collaboratorRoutes, { prefix: '/api/collaborators' });
 server.register(auditLogRoutes, { prefix: '/api/audit-logs' });
 server.register(evidenceCollectionRoutes, { prefix: '/api/evidence-collection' });
 server.register(consultationRoutes, { prefix: '/api/consultations' });
+server.register(traceAnalysisRoutes, { prefix: '/api/trace-analysis' });
 
 const start = async () => {
   try {
