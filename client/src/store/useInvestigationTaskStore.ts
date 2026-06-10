@@ -28,6 +28,7 @@ interface InvestigationTaskState {
   unlinkCollectionItem: (id: string, collectionItemId: string, collaboratorId: string) => Promise<void>;
   linkConnection: (id: string, connectionId: string, collaboratorId: string) => Promise<void>;
   unlinkConnection: (id: string, connectionId: string, collaboratorId: string) => Promise<void>;
+  clearSyncNotes: (id: string, collaboratorId?: string) => Promise<void>;
   setCurrentTask: (task: InvestigationTask | null) => void;
   getFilteredTasks: () => InvestigationTask[];
   getOverdueTasks: () => InvestigationTask[];
@@ -225,6 +226,20 @@ export const useInvestigationTaskStore = create<InvestigationTaskState>((set, ge
       }
     } catch (error) {
       console.error('Unlink connection failed:', error);
+    }
+  },
+
+  clearSyncNotes: async (id: string, collaboratorId?: string) => {
+    try {
+      const response = await investigationTaskApi.clearSyncNotes(id, collaboratorId);
+      if (response.success && response.data) {
+        set((state) => ({
+          tasks: state.tasks.map((t) => (t.id === id ? response.data! : t)),
+          currentTask: state.currentTask?.id === id ? response.data! : state.currentTask,
+        }));
+      }
+    } catch (error) {
+      console.error('Clear sync notes failed:', error);
     }
   },
 

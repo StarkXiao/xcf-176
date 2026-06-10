@@ -9,6 +9,7 @@ import { InvestigationTaskService } from '../services/InvestigationTaskService.j
 import { InvestigationTaskRepository } from '../repositories/InvestigationTaskRepository.js';
 import { AuditLogRepository } from '../repositories/AuditLogRepository.js';
 import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
+import { EvidenceCollectionRepository } from '../repositories/EvidenceCollectionRepository.js';
 
 const CASE_ID = 'test-case-001';
 const COL_A_ID = 'test-col-001';
@@ -31,6 +32,22 @@ function seedEvidence(evidenceId: string, caseId: string, content: string) {
   db.prepare(
     "INSERT OR IGNORE INTO evidence (id, case_id, content, source, importance, tags, position_x, position_y, width, height, color, status, created_at) VALUES (?, ?, ?, 'test', 'normal', '[]', 0, 0, 200, 120, '#3b82f6', 'pending', ?)"
   ).run(evidenceId, caseId, content, now);
+}
+
+function seedCollectionItem(id: string, caseId: string, content: string, status: string = 'verified') {
+  const db = getTestDb();
+  const now = new Date().toISOString();
+  db.prepare(
+    "INSERT INTO evidence_collection (id, case_id, source_type, content, content_hash, verification_status, collected_at) VALUES (?, ?, 'manual_entry', ?, ?, ?, ?)"
+  ).run(id, caseId, content, `hash-${id}`, status, now);
+}
+
+function archiveCollectionItem(id: string, evidenceId: string) {
+  const db = getTestDb();
+  const now = new Date().toISOString();
+  db.prepare(
+    "UPDATE evidence_collection SET archived_at = ?, archived_evidence_id = ? WHERE id = ?"
+  ).run(now, evidenceId, id);
 }
 
 function getAuditLogsByAction(action: string) {
@@ -57,6 +74,7 @@ describe('InvestigationTaskService - 创建任务', () => {
     expect(task.caseId).toBe(CASE_ID);
     expect(task.createdBy).toBe(COL_A_ID);
     expect(task.createdByName).toBe(COL_A_NAME);
+    expect(task.syncNotes).toEqual([]);
     const logs = getAuditLogsByAction('create_investigation_task');
     expect(logs).toHaveLength(1);
     expect(logs[0].detail).toContain('追踪资金流向');
@@ -202,10 +220,7 @@ describe('InvestigationTaskService - 关联证据', () => {
 
 describe('InvestigationTaskService - 关联采集项', () => {
   it('应成功关联采集项并写审计', () => {
-    const db = getTestDb();
-    db.prepare(
-      "INSERT INTO evidence_collection (id, case_id, source_type, content, content_hash, verification_status, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).run('col-001', CASE_ID, 'manual_entry', '采集项内容', 'hash-col-001', 'verified', new Date().toISOString());
+    seedCollectionItem('col-001', CASE_ID, '采集项内容');
 
     const task = InvestigationTaskService.createTask({
       caseId: CASE_ID,
@@ -219,10 +234,7 @@ describe('InvestigationTaskService - 关联采集项', () => {
   });
 
   it('应成功取消关联采集项', () => {
-    const db = getTestDb();
-    db.prepare(
-      "INSERT INTO evidence_collection (id, case_id, source_type, content, content_hash, verification_status, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).run('col-002', CASE_ID, 'manual_entry', '取消关联采集', 'hash-col-002', 'verified', new Date().toISOString());
+    seedCollectionItem('col-002', CASE_ID, '取消关联采集');
 
     const task = InvestigationTaskService.createTask({
       caseId: CASE_ID,
@@ -326,5 +338,150 @@ describe('InvestigationTaskService - 删除', () => {
 
   it('删除不存在的任务应返回false', () => {
     expect(InvestigationTaskService.deleteTask('non-existent', COL_A_ID)).toBe(false);
+  });
+});
+
+describe('InvestigationTaskService - 同步引擎: 采集项归档', () => {
+  it('采集项归档时应自动关联证据到任务并添加同步通知', () => {
+    seedCollectionItem('col-sync-001', CASE_ID, '待归档采集项');
+    seedEvidence('ev-sync-001', CASE_ID, '归档生成的证据');
+
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '同步测试任务',
+      collectionItemIds: ['col-sync-001'],
+      createdBy: COL_A_ID,
+    });
+
+    const updatedTasks = InvestigationTaskService.onCollectionArchived('col-sync-001', 'ev-sync-001');
+    expect(updatedTasks).toHaveLength(1);
+
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.evidenceIds).toContain('ev-sync-001');
+    expect(updated.syncNotes.length).toBe(1);
+    expect(updated.syncNotes[0].sourceType).toBe('collection_archived');
+    expect(updated.syncNotes[0].sourceId).toBe('col-sync-001');
+    expect(updated.syncNotes[0].detail).toContain('待归档采集项');
+
+    const logs = getAuditLogsByAction('sync_collection_archived');
+    expect(logs).toHaveLength(1);
+  });
+
+  it('已完成任务不应被采集项归档同步影响', () => {
+    seedCollectionItem('col-done-001', CASE_ID, '已完成任务的采集项');
+    seedEvidence('ev-done-001', CASE_ID, '证据');
+
+    InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '已完成任务',
+      collectionItemIds: ['col-done-001'],
+      createdBy: COL_A_ID,
+      assigneeId: COL_B_ID,
+    });
+    const tasks = InvestigationTaskService.getTasksByCaseId(CASE_ID);
+    InvestigationTaskService.updateTask(tasks[0].id, { status: 'in_progress' }, COL_A_ID);
+    InvestigationTaskService.updateTask(tasks[0].id, { status: 'completed' }, COL_A_ID);
+
+    const updatedTasks = InvestigationTaskService.onCollectionArchived('col-done-001', 'ev-done-001');
+    expect(updatedTasks).toHaveLength(0);
+  });
+
+  it('所有关联采集项归档后pending任务应自动推进为in_progress', () => {
+    seedCollectionItem('col-all-001', CASE_ID, '采集项1');
+    archiveCollectionItem('col-all-001', 'ev-old-001');
+
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '全部归档推进',
+      collectionItemIds: ['col-all-001'],
+      createdBy: COL_A_ID,
+    });
+
+    const updatedTasks = InvestigationTaskService.onCollectionArchived('col-all-001', 'ev-old-001');
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.status).toBe('in_progress');
+  });
+});
+
+describe('InvestigationTaskService - 同步引擎: 关系线变更', () => {
+  it('关系线变更时应给关联任务添加同步通知', () => {
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '关系线同步测试',
+      connectionIds: ['conn-sync-001'],
+      createdBy: COL_A_ID,
+    });
+
+    const updatedTasks = InvestigationTaskService.onConnectionUpdated('conn-sync-001', '标签: 旧 → 新');
+    expect(updatedTasks).toHaveLength(1);
+
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.syncNotes.length).toBe(1);
+    expect(updated.syncNotes[0].sourceType).toBe('connection_updated');
+    expect(updated.syncNotes[0].detail).toContain('标签: 旧 → 新');
+
+    const logs = getAuditLogsByAction('sync_connection_updated');
+    expect(logs).toHaveLength(1);
+  });
+
+  it('无关联关系线的任务不应收到通知', () => {
+    InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '无关任务',
+      createdBy: COL_A_ID,
+    });
+
+    const updatedTasks = InvestigationTaskService.onConnectionUpdated('conn-sync-002', '变更');
+    expect(updatedTasks).toHaveLength(0);
+  });
+});
+
+describe('InvestigationTaskService - 同步引擎: 证据变更', () => {
+  it('证据变更时应给关联任务添加同步通知', () => {
+    seedEvidence('ev-sync-002', CASE_ID, '变更证据');
+
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '证据同步测试',
+      evidenceIds: ['ev-sync-002'],
+      createdBy: COL_A_ID,
+    });
+
+    const updatedTasks = InvestigationTaskService.onEvidenceUpdated('ev-sync-002', '内容变更');
+    expect(updatedTasks).toHaveLength(1);
+
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.syncNotes.length).toBe(1);
+    expect(updated.syncNotes[0].sourceType).toBe('evidence_updated');
+
+    const logs = getAuditLogsByAction('sync_evidence_updated');
+    expect(logs).toHaveLength(1);
+  });
+});
+
+describe('InvestigationTaskService - 清除同步通知', () => {
+  it('应清除任务的同步通知并写审计', () => {
+    seedCollectionItem('col-clear-001', CASE_ID, '清除通知采集项');
+    seedEvidence('ev-clear-001', CASE_ID, '证据');
+
+    InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '清除通知测试',
+      collectionItemIds: ['col-clear-001'],
+      createdBy: COL_A_ID,
+    });
+    const tasks = InvestigationTaskService.getTasksByCaseId(CASE_ID);
+    InvestigationTaskService.onCollectionArchived('col-clear-001', 'ev-clear-001');
+
+    const beforeClear = InvestigationTaskRepository.findById(tasks[0].id)!;
+    expect(beforeClear.syncNotes.length).toBeGreaterThan(0);
+
+    const cleared = InvestigationTaskService.clearSyncNotes(tasks[0].id, COL_A_ID);
+    expect(cleared!.syncNotes).toEqual([]);
+  });
+
+  it('清除不存在任务的同步通知应返回null', () => {
+    const result = InvestigationTaskService.clearSyncNotes('non-existent', COL_A_ID);
+    expect(result).toBeNull();
   });
 });

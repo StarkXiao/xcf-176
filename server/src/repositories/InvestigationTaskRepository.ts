@@ -21,6 +21,7 @@ interface InvestigationTaskRow {
   evidence_ids: string;
   collection_item_ids: string;
   connection_ids: string;
+  sync_notes: string;
   created_by: string;
   created_by_name: string;
   completed_at: string | null;
@@ -41,6 +42,7 @@ const rowToTask = (row: InvestigationTaskRow): InvestigationTask => ({
   evidenceIds: JSON.parse(row.evidence_ids) as string[],
   collectionItemIds: JSON.parse(row.collection_item_ids) as string[],
   connectionIds: JSON.parse(row.connection_ids) as string[],
+  syncNotes: JSON.parse(row.sync_notes || '[]'),
   createdBy: row.created_by,
   createdByName: row.created_by_name,
   completedAt: row.completed_at,
@@ -82,6 +84,36 @@ export const InvestigationTaskRepository = {
     return rows.map(rowToTask);
   },
 
+  findByCollectionItemId: (collectionItemId: string): InvestigationTask[] => {
+    const allRows = db.prepare('SELECT * FROM investigation_tasks').all() as InvestigationTaskRow[];
+    return allRows
+      .filter((row) => {
+        const ids = JSON.parse(row.collection_item_ids) as string[];
+        return ids.includes(collectionItemId);
+      })
+      .map(rowToTask);
+  },
+
+  findByConnectionId: (connectionId: string): InvestigationTask[] => {
+    const allRows = db.prepare('SELECT * FROM investigation_tasks').all() as InvestigationTaskRow[];
+    return allRows
+      .filter((row) => {
+        const ids = JSON.parse(row.connection_ids) as string[];
+        return ids.includes(connectionId);
+      })
+      .map(rowToTask);
+  },
+
+  findByEvidenceId: (evidenceId: string): InvestigationTask[] => {
+    const allRows = db.prepare('SELECT * FROM investigation_tasks').all() as InvestigationTaskRow[];
+    return allRows
+      .filter((row) => {
+        const ids = JSON.parse(row.evidence_ids) as string[];
+        return ids.includes(evidenceId);
+      })
+      .map(rowToTask);
+  },
+
   create: (dto: CreateInvestigationTaskDto, assigneeName?: string, createdByName?: string): InvestigationTask => {
     const id = uuidv4();
     const now = new Date().toISOString();
@@ -89,10 +121,10 @@ export const InvestigationTaskRepository = {
       INSERT INTO investigation_tasks (
         id, case_id, title, description, priority, status,
         assignee_id, assignee_name, deadline,
-        evidence_ids, collection_item_ids, connection_ids,
+        evidence_ids, collection_item_ids, connection_ids, sync_notes,
         created_by, created_by_name, completed_at,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, '[]', ?, ?, NULL, ?, ?)
     `);
     stmt.run(
       id,
@@ -167,6 +199,10 @@ export const InvestigationTaskRepository = {
     if (dto.connectionIds !== undefined) {
       fields.push('connection_ids = ?');
       values.push(JSON.stringify(dto.connectionIds));
+    }
+    if (dto.syncNotes !== undefined) {
+      fields.push('sync_notes = ?');
+      values.push(JSON.stringify(dto.syncNotes));
     }
     fields.push('updated_at = ?');
     values.push(now);

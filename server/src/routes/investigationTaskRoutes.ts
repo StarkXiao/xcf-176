@@ -16,5 +16,6 @@ export const investigationTaskRoutes = async (fastify: FastifyInstance) => {
   fastify.post('/:id/unlink/collection', InvestigationTaskController.unlinkCollectionItem);
   fastify.post('/:id/link/connection', InvestigationTaskController.linkConnection);
   fastify.post('/:id/unlink/connection', InvestigationTaskController.unlinkConnection);
+  fastify.post('/:id/clear-sync-notes', InvestigationTaskController.clearSyncNotes);
   fastify.delete('/:id', InvestigationTaskController.deleteTask);
 };

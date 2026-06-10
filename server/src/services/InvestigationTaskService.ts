@@ -2,9 +2,11 @@ import { InvestigationTaskRepository } from '../repositories/InvestigationTaskRe
 import { CollaboratorRepository } from '../repositories/CollaboratorRepository.js';
 import { AuditLogRepository } from '../repositories/AuditLogRepository.js';
 import { EvidenceCollectionRepository } from '../repositories/EvidenceCollectionRepository.js';
+import { v4 as uuidv4 } from 'uuid';
 import type {
   InvestigationTask,
   InvestigationTaskStatus,
+  InvestigationTaskSyncNote,
   CreateInvestigationTaskDto,
   UpdateInvestigationTaskDto,
   CreateAuditLogDto,
@@ -176,6 +178,117 @@ export const InvestigationTaskService = {
     if (!updated) return null;
 
     recordAuditLog(existing.caseId, 'link_connection_to_task', 'case', id, `取消关联关系线: ${connectionId}`, collaboratorId);
+    return updated;
+  },
+
+  onCollectionArchived: (collectionItemId: string, evidenceId: string): InvestigationTask[] => {
+    const affectedTasks = InvestigationTaskRepository.findByCollectionItemId(collectionItemId);
+    const updatedTasks: InvestigationTask[] = [];
+
+    for (const task of affectedTasks) {
+      if (task.status === 'completed' || task.status === 'cancelled') continue;
+
+      const patch: UpdateInvestigationTaskDto = {};
+      const newEvidenceIds = task.evidenceIds.includes(evidenceId)
+        ? task.evidenceIds
+        : [...task.evidenceIds, evidenceId];
+      if (newEvidenceIds.length !== task.evidenceIds.length) {
+        patch.evidenceIds = newEvidenceIds;
+      }
+
+      const collectionItem = EvidenceCollectionRepository.findById(collectionItemId);
+      const note: InvestigationTaskSyncNote = {
+        id: uuidv4(),
+        sourceType: 'collection_archived',
+        sourceId: collectionItemId,
+        detail: `采集项「${collectionItem?.content.slice(0, 30) ?? collectionItemId}」已归档为证据卡片`,
+        timestamp: new Date().toISOString(),
+      };
+      patch.syncNotes = [...task.syncNotes, note];
+
+      const allLinkedCollected = InvestigationTaskRepository.findById(task.id);
+      if (allLinkedCollected) {
+        const allArchived = allLinkedCollected.collectionItemIds.every((cid) => {
+          const item = EvidenceCollectionRepository.findById(cid);
+          return item && item.archivedAt;
+        });
+        if (allArchived && allLinkedCollected.collectionItemIds.length > 0 && task.status === 'pending') {
+          patch.status = 'in_progress';
+        }
+      }
+
+      const updated = InvestigationTaskRepository.update(task.id, patch);
+      if (updated) {
+        recordAuditLog(task.caseId, 'sync_collection_archived', 'case', task.id, note.detail, 'system');
+        updatedTasks.push(updated);
+      }
+    }
+
+    return updatedTasks;
+  },
+
+  onConnectionUpdated: (connectionId: string, changeDetail: string): InvestigationTask[] => {
+    const affectedTasks = InvestigationTaskRepository.findByConnectionId(connectionId);
+    const updatedTasks: InvestigationTask[] = [];
+
+    for (const task of affectedTasks) {
+      if (task.status === 'completed' || task.status === 'cancelled') continue;
+
+      const note: InvestigationTaskSyncNote = {
+        id: uuidv4(),
+        sourceType: 'connection_updated',
+        sourceId: connectionId,
+        detail: `关联关系线变更: ${changeDetail}`,
+        timestamp: new Date().toISOString(),
+      };
+
+      const updated = InvestigationTaskRepository.update(task.id, {
+        syncNotes: [...task.syncNotes, note],
+      });
+      if (updated) {
+        recordAuditLog(task.caseId, 'sync_connection_updated', 'case', task.id, note.detail, 'system');
+        updatedTasks.push(updated);
+      }
+    }
+
+    return updatedTasks;
+  },
+
+  onEvidenceUpdated: (evidenceId: string, changeDetail: string): InvestigationTask[] => {
+    const affectedTasks = InvestigationTaskRepository.findByEvidenceId(evidenceId);
+    const updatedTasks: InvestigationTask[] = [];
+
+    for (const task of affectedTasks) {
+      if (task.status === 'completed' || task.status === 'cancelled') continue;
+
+      const note: InvestigationTaskSyncNote = {
+        id: uuidv4(),
+        sourceType: 'evidence_updated',
+        sourceId: evidenceId,
+        detail: `关联证据变更: ${changeDetail}`,
+        timestamp: new Date().toISOString(),
+      };
+
+      const updated = InvestigationTaskRepository.update(task.id, {
+        syncNotes: [...task.syncNotes, note],
+      });
+      if (updated) {
+        recordAuditLog(task.caseId, 'sync_evidence_updated', 'case', task.id, note.detail, 'system');
+        updatedTasks.push(updated);
+      }
+    }
+
+    return updatedTasks;
+  },
+
+  clearSyncNotes: (id: string, collaboratorId: string): InvestigationTask | null => {
+    const existing = InvestigationTaskRepository.findById(id);
+    if (!existing) return null;
+
+    const updated = InvestigationTaskRepository.update(id, { syncNotes: [] });
+    if (updated && existing.syncNotes.length > 0) {
+      recordAuditLog(existing.caseId, 'update_investigation_task', 'case', id, `已确认${existing.syncNotes.length}条同步通知`, collaboratorId);
+    }
     return updated;
   },
 

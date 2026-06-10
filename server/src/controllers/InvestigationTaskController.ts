@@ -285,4 +285,21 @@ export const InvestigationTaskController = {
       return reply.status(500).send(response);
     }
   },
+
+  async clearSyncNotes(req: FastifyRequest<TaskIdParams & { Body: { collaboratorId?: string } }>, reply: FastifyReply) {
+    try {
+      const { id } = req.params;
+      const collaboratorId = req.body?.collaboratorId ?? 'system';
+      const updated = InvestigationTaskService.clearSyncNotes(id, collaboratorId);
+      if (!updated) {
+        const response: ApiResponse<null> = { success: false, error: '侦查任务不存在' };
+        return reply.status(404).send(response);
+      }
+      const response: ApiResponse<typeof updated> = { success: true, data: updated, message: '同步通知已确认' };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = { success: false, error: (error as Error).message };
+      return reply.status(500).send(response);
+    }
+  },
 };

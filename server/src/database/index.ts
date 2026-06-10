@@ -178,6 +178,7 @@ const createTables = () => {
       evidence_ids TEXT DEFAULT '[]',
       collection_item_ids TEXT DEFAULT '[]',
       connection_ids TEXT DEFAULT '[]',
+      sync_notes TEXT DEFAULT '[]',
       created_by TEXT NOT NULL,
       created_by_name TEXT NOT NULL DEFAULT '',
       completed_at TEXT,

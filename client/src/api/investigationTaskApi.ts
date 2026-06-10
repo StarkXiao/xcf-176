@@ -97,4 +97,11 @@ export const investigationTaskApi = {
       body: JSON.stringify({ collaboratorId }),
     });
   },
+
+  async clearSyncNotes(id: string, collaboratorId?: string): Promise<ApiResponse<InvestigationTask>> {
+    return request<InvestigationTask>(`/investigation-tasks/${id}/clear-sync-notes`, {
+      method: 'POST',
+      body: JSON.stringify({ collaboratorId }),
+    });
+  },
 };

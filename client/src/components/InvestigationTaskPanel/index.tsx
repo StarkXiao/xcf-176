@@ -13,6 +13,8 @@ import {
   Calendar,
   ShieldCheck,
   FileText,
+  Bell,
+  RefreshCw,
 } from 'lucide-react';
 import { NeonInput } from '@/components/ui/NeonInput';
 import { NeonButton } from '@/components/ui/NeonButton';
@@ -21,10 +23,13 @@ import { useInvestigationTaskStore } from '@/store/useInvestigationTaskStore';
 import { useCollaboratorStore } from '@/store/useCollaboratorStore';
 import { useUiStore } from '@/store/useUiStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
+import { useEvidenceCollectionStore } from '@/store/useEvidenceCollectionStore';
+import { useCanvasStore } from '@/store/useCanvasStore';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
 import { recordAuditLog } from '@/utils/auditHelper';
 import type {
   InvestigationTask,
+  InvestigationTaskSyncNote,
   InvestigationTaskStatus,
   InvestigationTaskPriority,
 } from '@/types';
@@ -57,6 +62,18 @@ const PRIORITY_COLORS: Record<InvestigationTaskPriority, string> = {
   critical: CYBERPUNK_COLORS.accentRed,
 };
 
+const SYNC_NOTE_ICONS: Record<InvestigationTaskSyncNote['sourceType'], string> = {
+  collection_archived: '📦',
+  evidence_updated: '📝',
+  connection_updated: '🔗',
+};
+
+const SYNC_NOTE_COLORS: Record<InvestigationTaskSyncNote['sourceType'], string> = {
+  collection_archived: CYBERPUNK_COLORS.accentGreen,
+  evidence_updated: CYBERPUNK_COLORS.accentYellow,
+  connection_updated: CYBERPUNK_COLORS.accentCyan,
+};
+
 const FILTER_OPTIONS: Array<{ value: 'all' | InvestigationTaskStatus; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'pending', label: '待处理' },
@@ -82,6 +99,7 @@ export const InvestigationTaskPanel: React.FC = () => {
   const unlinkCollectionItem = useInvestigationTaskStore((s) => s.unlinkCollectionItem);
   const linkConnection = useInvestigationTaskStore((s) => s.linkConnection);
   const unlinkConnection = useInvestigationTaskStore((s) => s.unlinkConnection);
+  const clearSyncNotes = useInvestigationTaskStore((s) => s.clearSyncNotes);
   const setCurrentTask = useInvestigationTaskStore((s) => s.setCurrentTask);
   const setFilter = useInvestigationTaskStore((s) => s.setFilter);
   const getFilteredTasks = useInvestigationTaskStore((s) => s.getFilteredTasks);
@@ -90,6 +108,9 @@ export const InvestigationTaskPanel: React.FC = () => {
   const collaborators = useCollaboratorStore((s) => s.collaborators);
   const currentCollaboratorId = useUiStore((s) => s.currentCollaboratorId);
   const evidenceList = useEvidenceStore((s) => s.getEvidenceArray());
+  const collectionItems = useEvidenceCollectionStore((s) => s.items);
+  const loadCollectionItems = useEvidenceCollectionStore((s) => s.loadItems);
+  const connections = useCanvasStore((s) => s.connections);
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -98,17 +119,21 @@ export const InvestigationTaskPanel: React.FC = () => {
   const [newAssigneeId, setNewAssigneeId] = useState('');
   const [newDeadline, setNewDeadline] = useState('');
   const [newEvidenceIds, setNewEvidenceIds] = useState<string[]>([]);
+  const [newCollectionItemIds, setNewCollectionItemIds] = useState<string[]>([]);
+  const [newConnectionIds, setNewConnectionIds] = useState<string[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [showLinkEvidence, setShowLinkEvidence] = useState(false);
   const [showLinkCollection, setShowLinkCollection] = useState(false);
   const [showLinkConnection, setShowLinkConnection] = useState(false);
+  const [showSyncNotes, setShowSyncNotes] = useState(false);
 
   useEffect(() => {
     if (currentCase) {
       loadTasks(currentCase.id);
+      loadCollectionItems(currentCase.id);
     }
-  }, [currentCase, loadTasks]);
+  }, [currentCase, loadTasks, loadCollectionItems]);
 
   const currentCollaborator = useMemo(() => {
     return collaborators.find((c) => c.id === currentCollaboratorId);
@@ -116,6 +141,32 @@ export const InvestigationTaskPanel: React.FC = () => {
 
   const filteredTasks = useMemo(() => getFilteredTasks(), [tasks, filter]);
   const overdueTasks = useMemo(() => getOverdueTasks(), [tasks]);
+
+  const totalSyncNotes = useMemo(() => {
+    return tasks.reduce((sum, t) => sum + (t.syncNotes?.length ?? 0), 0);
+  }, [tasks]);
+
+  const getCollectionLabel = (collectionItemId: string) => {
+    const item = collectionItems.find((i) => i.id === collectionItemId);
+    if (!item) return collectionItemId;
+    const statusIcon = item.archivedAt ? '✅' : item.verificationStatus === 'verified' ? '✔' : '⏳';
+    return `${statusIcon} ${item.content.slice(0, 24)}${item.content.length > 24 ? '...' : ''}`;
+  };
+
+  const getConnectionLabel = (connectionId: string) => {
+    const conn = connections.find((c) => c.id === connectionId);
+    if (!conn) return connectionId;
+    const fromEv = evidenceList.find((e) => e.id === conn.fromEvidenceId);
+    const toEv = evidenceList.find((e) => e.id === conn.toEvidenceId);
+    const fromLabel = fromEv ? fromEv.content.slice(0, 12) : conn.fromEvidenceId.slice(0, 8);
+    const toLabel = toEv ? toEv.content.slice(0, 12) : conn.toEvidenceId.slice(0, 8);
+    return `${fromLabel} → ${toLabel}${conn.label ? ` (${conn.label})` : ''}`;
+  };
+
+  const getEvidenceLabel = (evidenceId: string) => {
+    const ev = evidenceList.find((e) => e.id === evidenceId);
+    return ev ? ev.content.slice(0, 30) + (ev.content.length > 30 ? '...' : '') : evidenceId;
+  };
 
   const handleCreate = async () => {
     if (!newTitle.trim() || !currentCase || !currentCollaboratorId) return;
@@ -127,6 +178,8 @@ export const InvestigationTaskPanel: React.FC = () => {
       assigneeId: newAssigneeId || null,
       deadline: newDeadline || null,
       evidenceIds: newEvidenceIds,
+      collectionItemIds: newCollectionItemIds,
+      connectionIds: newConnectionIds,
       createdBy: currentCollaboratorId,
     });
     if (result) {
@@ -137,6 +190,8 @@ export const InvestigationTaskPanel: React.FC = () => {
       setNewAssigneeId('');
       setNewDeadline('');
       setNewEvidenceIds([]);
+      setNewCollectionItemIds([]);
+      setNewConnectionIds([]);
       setShowCreateForm(false);
     }
   };
@@ -192,6 +247,11 @@ export const InvestigationTaskPanel: React.FC = () => {
     await unlinkConnection(currentTask.id, connectionId, currentCollaboratorId);
   };
 
+  const handleClearSyncNotes = async () => {
+    if (!currentTask) return;
+    await clearSyncNotes(currentTask.id, currentCollaboratorId ?? undefined);
+  };
+
   const handleInlineEdit = async (field: string, value: string) => {
     if (!currentTask || !currentCollaboratorId) return;
     const update: Record<string, string> = {};
@@ -222,15 +282,28 @@ export const InvestigationTaskPanel: React.FC = () => {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  const getEvidenceLabel = (evidenceId: string) => {
-    const ev = evidenceList.find((e) => e.id === evidenceId);
-    return ev ? ev.content.slice(0, 30) + '...' : evidenceId;
-  };
-
   const toggleNewEvidenceSelection = (id: string) => {
     setNewEvidenceIds((prev) =>
       prev.includes(id) ? prev.filter((eid) => eid !== id) : [...prev, id]
     );
+  };
+
+  const toggleNewCollectionSelection = (id: string) => {
+    setNewCollectionItemIds((prev) =>
+      prev.includes(id) ? prev.filter((cid) => cid !== id) : [...prev, id]
+    );
+  };
+
+  const toggleNewConnectionSelection = (id: string) => {
+    setNewConnectionIds((prev) =>
+      prev.includes(id) ? prev.filter((cid) => cid !== id) : [...prev, id]
+    );
+  };
+
+  const selectStyle = {
+    backgroundColor: CYBERPUNK_COLORS.bgPrimary,
+    borderColor: CYBERPUNK_COLORS.borderColor,
+    color: CYBERPUNK_COLORS.textPrimary,
   };
 
   const renderTaskList = () => (
@@ -246,6 +319,20 @@ export const InvestigationTaskPanel: React.FC = () => {
           <AlertTriangle size={14} style={{ color: CYBERPUNK_COLORS.accentRed }} />
           <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.accentRed }}>
             {overdueTasks.length} 项任务已逾期
+          </span>
+        </div>
+      )}
+      {totalSyncNotes > 0 && (
+        <div
+          className="rounded-sm border p-2 mb-2 flex items-center gap-2"
+          style={{
+            borderColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.4),
+            backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.08),
+          }}
+        >
+          <Bell size={14} style={{ color: CYBERPUNK_COLORS.accentCyan }} />
+          <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.accentCyan }}>
+            {totalSyncNotes} 条来源同步通知
           </span>
         </div>
       )}
@@ -275,6 +362,7 @@ export const InvestigationTaskPanel: React.FC = () => {
         const priorityColor = PRIORITY_COLORS[task.priority];
         const overdue = isOverdue(task);
         const daysLeft = getDaysRemaining(task.deadline);
+        const syncCount = task.syncNotes?.length ?? 0;
 
         return (
           <div
@@ -322,6 +410,18 @@ export const InvestigationTaskPanel: React.FC = () => {
                   >
                     {STATUS_LABELS[task.status]}
                   </span>
+                  {syncCount > 0 && (
+                    <span
+                      className="text-xs font-mono px-1.5 py-0.5 rounded-sm"
+                      style={{
+                        backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.15),
+                        color: CYBERPUNK_COLORS.accentCyan,
+                        border: `1px solid ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.3)}`,
+                      }}
+                    >
+                      <Bell size={8} className="inline" /> {syncCount}
+                    </span>
+                  )}
                   <span
                     className="text-xs font-mono truncate flex-1"
                     style={{ color: CYBERPUNK_COLORS.textPrimary }}
@@ -355,6 +455,11 @@ export const InvestigationTaskPanel: React.FC = () => {
                     {task.evidenceIds.length > 0 && (
                       <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
                         {task.evidenceIds.length} 证据
+                      </span>
+                    )}
+                    {task.collectionItemIds.length > 0 && (
+                      <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+                        {task.collectionItemIds.length} 采集
                       </span>
                     )}
                   </div>
@@ -406,8 +511,7 @@ export const InvestigationTaskPanel: React.FC = () => {
             onChange={(e) => setNewPriority(e.target.value as InvestigationTaskPriority)}
             className="w-full text-xs font-mono px-2 py-1.5 border rounded-sm"
             style={{
-              backgroundColor: CYBERPUNK_COLORS.bgPrimary,
-              borderColor: CYBERPUNK_COLORS.borderColor,
+              ...selectStyle,
               color: PRIORITY_COLORS[newPriority],
             }}
           >
@@ -425,8 +529,7 @@ export const InvestigationTaskPanel: React.FC = () => {
             onChange={(e) => setNewAssigneeId(e.target.value)}
             className="w-full text-xs font-mono px-2 py-1.5 border rounded-sm"
             style={{
-              backgroundColor: CYBERPUNK_COLORS.bgPrimary,
-              borderColor: CYBERPUNK_COLORS.borderColor,
+              ...selectStyle,
               color: newAssigneeId ? CYBERPUNK_COLORS.accentPurple : CYBERPUNK_COLORS.textSecondary,
             }}
           >
@@ -446,17 +549,13 @@ export const InvestigationTaskPanel: React.FC = () => {
           value={newDeadline}
           onChange={(e) => setNewDeadline(e.target.value)}
           className="w-full text-xs font-mono px-2 py-1.5 border rounded-sm"
-          style={{
-            backgroundColor: CYBERPUNK_COLORS.bgPrimary,
-            borderColor: CYBERPUNK_COLORS.borderColor,
-            color: CYBERPUNK_COLORS.textPrimary,
-          }}
+          style={selectStyle}
         />
       </div>
       {evidenceList.length > 0 && (
         <div className="space-y-1">
           <div className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
-            <Link2 size={10} className="inline mr-1" />关联证据卡片
+            <FileText size={10} className="inline mr-1" />关联证据卡片
           </div>
           <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
             {evidenceList.map((ev) => (
@@ -471,6 +570,52 @@ export const InvestigationTaskPanel: React.FC = () => {
                 onClick={() => toggleNewEvidenceSelection(ev.id)}
               >
                 {ev.content.slice(0, 16)}...
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {collectionItems.filter((i) => !i.archivedAt).length > 0 && (
+        <div className="space-y-1">
+          <div className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+            <ShieldCheck size={10} className="inline mr-1" />关联采集项
+          </div>
+          <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+            {collectionItems.filter((i) => !i.archivedAt).map((item) => (
+              <button
+                key={item.id}
+                className="text-xs font-mono px-1.5 py-0.5 rounded-sm border transition-all"
+                style={{
+                  borderColor: newCollectionItemIds.includes(item.id) ? CYBERPUNK_COLORS.accentGreen : CYBERPUNK_COLORS.borderColor,
+                  color: newCollectionItemIds.includes(item.id) ? CYBERPUNK_COLORS.accentGreen : CYBERPUNK_COLORS.textSecondary,
+                  backgroundColor: newCollectionItemIds.includes(item.id) ? getGlowColor(CYBERPUNK_COLORS.accentGreen, 0.1) : 'transparent',
+                }}
+                onClick={() => toggleNewCollectionSelection(item.id)}
+              >
+                {item.content.slice(0, 16)}...
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {connections.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+            <Link2 size={10} className="inline mr-1" />关联关系线
+          </div>
+          <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+            {connections.map((conn) => (
+              <button
+                key={conn.id}
+                className="text-xs font-mono px-1.5 py-0.5 rounded-sm border transition-all"
+                style={{
+                  borderColor: newConnectionIds.includes(conn.id) ? CYBERPUNK_COLORS.accentYellow : CYBERPUNK_COLORS.borderColor,
+                  color: newConnectionIds.includes(conn.id) ? CYBERPUNK_COLORS.accentYellow : CYBERPUNK_COLORS.textSecondary,
+                  backgroundColor: newConnectionIds.includes(conn.id) ? getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.1) : 'transparent',
+                }}
+                onClick={() => toggleNewConnectionSelection(conn.id)}
+              >
+                {getConnectionLabel(conn.id).slice(0, 20)}...
               </button>
             ))}
           </div>
@@ -491,6 +636,8 @@ export const InvestigationTaskPanel: React.FC = () => {
             setNewAssigneeId('');
             setNewDeadline('');
             setNewEvidenceIds([]);
+            setNewCollectionItemIds([]);
+            setNewConnectionIds([]);
           }}
         >
           取消
@@ -498,6 +645,72 @@ export const InvestigationTaskPanel: React.FC = () => {
       </div>
     </div>
   );
+
+  const renderSyncNotes = (task: InvestigationTask) => {
+    const notes = task.syncNotes ?? [];
+    if (notes.length === 0) return null;
+
+    return (
+      <div
+        className="rounded-sm border p-2.5 space-y-2"
+        style={{
+          borderColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.4),
+          backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.04),
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-mono font-bold flex items-center gap-1" style={{ color: CYBERPUNK_COLORS.accentCyan }}>
+            <Bell size={12} />
+            同步通知 ({notes.length})
+          </div>
+          <div className="flex gap-1">
+            <button
+              className="text-xs font-mono px-1.5 py-0.5 rounded-sm border transition-all"
+              style={{
+                borderColor: CYBERPUNK_COLORS.accentCyan,
+                color: CYBERPUNK_COLORS.accentCyan,
+              }}
+              onClick={() => setShowSyncNotes(!showSyncNotes)}
+            >
+              {showSyncNotes ? '收起' : '展开'}
+            </button>
+            <button
+              className="text-xs font-mono px-1.5 py-0.5 rounded-sm border transition-all"
+              style={{
+                borderColor: CYBERPUNK_COLORS.accentGreen,
+                color: CYBERPUNK_COLORS.accentGreen,
+              }}
+              onClick={handleClearSyncNotes}
+            >
+              全部已读
+            </button>
+          </div>
+        </div>
+        {showSyncNotes && (
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            {notes.map((note) => (
+              <div
+                key={note.id}
+                className="flex items-start gap-1.5 text-xs font-mono px-2 py-1.5 rounded-sm"
+                style={{
+                  backgroundColor: getGlowColor(SYNC_NOTE_COLORS[note.sourceType], 0.08),
+                  border: `1px solid ${getGlowColor(SYNC_NOTE_COLORS[note.sourceType], 0.2)}`,
+                }}
+              >
+                <span className="flex-shrink-0">{SYNC_NOTE_ICONS[note.sourceType]}</span>
+                <div className="flex-1">
+                  <div style={{ color: SYNC_NOTE_COLORS[note.sourceType] }}>{note.detail}</div>
+                  <div className="mt-0.5" style={{ color: CYBERPUNK_COLORS.textSecondary, fontSize: '9px' }}>
+                    {new Date(note.timestamp).toLocaleString('zh-CN')}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderTaskDetail = () => {
     if (!currentTask) return null;
@@ -507,6 +720,7 @@ export const InvestigationTaskPanel: React.FC = () => {
     const overdue = isOverdue(task);
     const daysLeft = getDaysRemaining(task.deadline);
     const isActive = task.status !== 'completed' && task.status !== 'cancelled';
+    const syncCount = task.syncNotes?.length ?? 0;
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -518,7 +732,7 @@ export const InvestigationTaskPanel: React.FC = () => {
             <button
               className="p-1 transition-colors"
               style={{ color: CYBERPUNK_COLORS.accentCyan }}
-              onClick={() => setCurrentTask(null)}
+              onClick={() => { setCurrentTask(null); setShowSyncNotes(false); }}
             >
               <ArrowLeft size={16} />
             </button>
@@ -543,6 +757,19 @@ export const InvestigationTaskPanel: React.FC = () => {
                 }}
               >
                 {task.title}
+              </span>
+            )}
+            {syncCount > 0 && (
+              <span
+                className="text-xs font-mono px-1.5 py-0.5 rounded-sm cursor-pointer"
+                style={{
+                  backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.15),
+                  color: CYBERPUNK_COLORS.accentCyan,
+                  border: `1px solid ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.3)}`,
+                }}
+                onClick={() => setShowSyncNotes(!showSyncNotes)}
+              >
+                <Bell size={8} className="inline" /> {syncCount}
               </span>
             )}
           </div>
@@ -588,6 +815,8 @@ export const InvestigationTaskPanel: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {renderSyncNotes(task)}
+
           <div
             className="rounded-sm border p-2.5 space-y-2"
             style={{ borderColor: CYBERPUNK_COLORS.borderColor, backgroundColor: CYBERPUNK_COLORS.bgTertiary }}
@@ -621,8 +850,7 @@ export const InvestigationTaskPanel: React.FC = () => {
                   }}
                   className="w-full text-xs font-mono px-2 py-1 border rounded-sm"
                   style={{
-                    backgroundColor: CYBERPUNK_COLORS.bgPrimary,
-                    borderColor: CYBERPUNK_COLORS.borderColor,
+                    ...selectStyle,
                     color: task.assigneeId ? CYBERPUNK_COLORS.accentPurple : CYBERPUNK_COLORS.textSecondary,
                   }}
                 >
@@ -666,11 +894,7 @@ export const InvestigationTaskPanel: React.FC = () => {
                 <input
                   type="datetime-local"
                   className="w-full text-xs font-mono px-2 py-1 border rounded-sm"
-                  style={{
-                    backgroundColor: CYBERPUNK_COLORS.bgPrimary,
-                    borderColor: CYBERPUNK_COLORS.borderColor,
-                    color: CYBERPUNK_COLORS.textPrimary,
-                  }}
+                  style={selectStyle}
                   onChange={(e) => {
                     if (currentCollaboratorId && e.target.value) {
                       updateTask(task.id, { deadline: new Date(e.target.value).toISOString() }, currentCollaboratorId);
@@ -757,7 +981,7 @@ export const InvestigationTaskPanel: React.FC = () => {
                   border: `1px solid ${getGlowColor(CYBERPUNK_COLORS.accentPurple, 0.2)}`,
                 }}
               >
-                <Link2 size={10} />
+                <FileText size={10} />
                 <span className="flex-1 truncate">{getEvidenceLabel(eid)}</span>
                 {isActive && (
                   <button
@@ -839,7 +1063,7 @@ export const InvestigationTaskPanel: React.FC = () => {
                 }}
               >
                 <ShieldCheck size={10} />
-                <span className="flex-1 truncate">{cid}</span>
+                <span className="flex-1 truncate">{getCollectionLabel(cid)}</span>
                 {isActive && (
                   <button
                     className="p-0.5 transition-colors flex-shrink-0"
@@ -854,16 +1078,29 @@ export const InvestigationTaskPanel: React.FC = () => {
               </div>
             ))}
             {showLinkCollection && (
-              <div>
-                <NeonInput
-                  placeholder="输入采集项ID..."
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                      handleLinkCollection(e.currentTarget.value.trim());
-                      e.currentTarget.value = '';
-                    }
-                  }}
-                />
+              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                {collectionItems
+                  .filter((item) => !task.collectionItemIds.includes(item.id) && !item.archivedAt)
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      className="text-xs font-mono px-1.5 py-0.5 rounded-sm border transition-all"
+                      style={{
+                        borderColor: getGlowColor(CYBERPUNK_COLORS.accentGreen, 0.3),
+                        color: CYBERPUNK_COLORS.accentGreen,
+                        backgroundColor: 'transparent',
+                      }}
+                      onClick={() => handleLinkCollection(item.id)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = getGlowColor(CYBERPUNK_COLORS.accentGreen, 0.1);
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {item.content.slice(0, 20)}...
+                    </button>
+                  ))}
               </div>
             )}
           </div>
@@ -907,7 +1144,7 @@ export const InvestigationTaskPanel: React.FC = () => {
                 }}
               >
                 <Link2 size={10} />
-                <span className="flex-1 truncate">{cid}</span>
+                <span className="flex-1 truncate">{getConnectionLabel(cid)}</span>
                 {isActive && (
                   <button
                     className="p-0.5 transition-colors flex-shrink-0"
@@ -922,16 +1159,29 @@ export const InvestigationTaskPanel: React.FC = () => {
               </div>
             ))}
             {showLinkConnection && (
-              <div>
-                <NeonInput
-                  placeholder="输入关系线ID..."
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                      handleLinkConnection(e.currentTarget.value.trim());
-                      e.currentTarget.value = '';
-                    }
-                  }}
-                />
+              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                {connections
+                  .filter((conn) => !task.connectionIds.includes(conn.id))
+                  .map((conn) => (
+                    <button
+                      key={conn.id}
+                      className="text-xs font-mono px-1.5 py-0.5 rounded-sm border transition-all"
+                      style={{
+                        borderColor: getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.3),
+                        color: CYBERPUNK_COLORS.accentYellow,
+                        backgroundColor: 'transparent',
+                      }}
+                      onClick={() => handleLinkConnection(conn.id)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.1);
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {getConnectionLabel(conn.id).slice(0, 22)}
+                    </button>
+                  ))}
               </div>
             )}
           </div>
@@ -979,14 +1229,39 @@ export const InvestigationTaskPanel: React.FC = () => {
           >
             {tasks.length}
           </span>
+          {totalSyncNotes > 0 && (
+            <span
+              className="text-xs font-mono px-1.5 py-0.5 rounded-sm flex items-center gap-1"
+              style={{
+                backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.15),
+                color: CYBERPUNK_COLORS.accentYellow,
+                border: `1px solid ${getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.3)}`,
+              }}
+            >
+              <Bell size={10} />
+              {totalSyncNotes}
+            </span>
+          )}
         </div>
-        <button
-          onClick={togglePanel}
-          className="p-1 transition-colors"
-          style={{ color: CYBERPUNK_COLORS.textSecondary }}
-        >
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-1">
+          {currentCase && (
+            <button
+              className="p-1 transition-colors"
+              style={{ color: CYBERPUNK_COLORS.textSecondary }}
+              onClick={() => { loadTasks(currentCase.id); loadCollectionItems(currentCase.id); }}
+              title="刷新"
+            >
+              <RefreshCw size={14} />
+            </button>
+          )}
+          <button
+            onClick={togglePanel}
+            className="p-1 transition-colors"
+            style={{ color: CYBERPUNK_COLORS.textSecondary }}
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       {currentTask ? (

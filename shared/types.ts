@@ -206,7 +206,10 @@ export type AuditAction =
   | 'complete_investigation_task'
   | 'link_evidence_to_task'
   | 'link_collection_to_task'
-  | 'link_connection_to_task';
+  | 'link_connection_to_task'
+  | 'sync_collection_archived'
+  | 'sync_evidence_updated'
+  | 'sync_connection_updated';
 
 export interface AuditLog {
   id: string;
@@ -377,6 +380,14 @@ export interface TraceGraph {
 export type InvestigationTaskPriority = 'low' | 'normal' | 'high' | 'critical';
 export type InvestigationTaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
+export interface InvestigationTaskSyncNote {
+  id: string;
+  sourceType: 'collection_archived' | 'evidence_updated' | 'connection_updated';
+  sourceId: string;
+  detail: string;
+  timestamp: string;
+}
+
 export interface InvestigationTask {
   id: string;
   caseId: string;
@@ -390,6 +401,7 @@ export interface InvestigationTask {
   evidenceIds: string[];
   collectionItemIds: string[];
   connectionIds: string[];
+  syncNotes: InvestigationTaskSyncNote[];
   createdBy: string;
   createdByName: string;
   completedAt: string | null;
@@ -420,6 +432,7 @@ export interface UpdateInvestigationTaskDto {
   evidenceIds?: string[];
   collectionItemIds?: string[];
   connectionIds?: string[];
+  syncNotes?: InvestigationTaskSyncNote[];
 }
 
 export interface ApiResponse<T> {

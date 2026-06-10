@@ -1,4 +1,5 @@
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
+import { InvestigationTaskService } from './InvestigationTaskService.js';
 import type { Connection, CreateConnectionDto } from '@shared/types';
 
 export interface UpdateConnectionDto {
@@ -29,7 +30,21 @@ export const ConnectionService = {
   },
 
   updateConnection: (id: string, dto: UpdateConnectionDto): Connection | null => {
-    return ConnectionRepository.update(id, dto);
+    const existing = ConnectionRepository.findById(id);
+    const updated = ConnectionRepository.update(id, dto);
+    if (updated && existing) {
+      const changes: string[] = [];
+      if (dto.label !== undefined && dto.label !== existing.label) {
+        changes.push(`标签: ${existing.label} → ${dto.label}`);
+      }
+      if (dto.lineStyle !== undefined && dto.lineStyle !== existing.lineStyle) {
+        changes.push(`线型: ${existing.lineStyle} → ${dto.lineStyle}`);
+      }
+      if (changes.length > 0) {
+        InvestigationTaskService.onConnectionUpdated(id, changes.join(', '));
+      }
+    }
+    return updated;
   },
 
   deleteConnection: (id: string): boolean => {

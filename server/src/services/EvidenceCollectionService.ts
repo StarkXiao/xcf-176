@@ -3,6 +3,7 @@ import { EvidenceCollectionRepository } from '../repositories/EvidenceCollection
 import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
 import { AuditLogRepository } from '../repositories/AuditLogRepository.js';
 import { CollaboratorRepository } from '../repositories/CollaboratorRepository.js';
+import { InvestigationTaskService } from './InvestigationTaskService.js';
 import type {
   EvidenceCollectionItem,
   CreateCollectionItemDto,
@@ -129,6 +130,8 @@ export const EvidenceCollectionService = {
     const updated = EvidenceCollectionRepository.markArchived(id, createdEvidence.id);
 
     recordAuditLog(item.caseId, 'create_evidence', 'evidence', createdEvidence.id, `归档证据: ${item.content.slice(0, 30)}`, collaboratorId);
+
+    InvestigationTaskService.onCollectionArchived(id, createdEvidence.id);
 
     return updated!;
   },

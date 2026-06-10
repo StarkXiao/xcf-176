@@ -44,6 +44,9 @@ const ACTION_LABELS: { [key in AuditAction]: string } = {
   link_evidence_to_task: '关联证据',
   link_collection_to_task: '关联采集',
   link_connection_to_task: '关联关系',
+  sync_collection_archived: '采集归档同步',
+  sync_evidence_updated: '证据变更同步',
+  sync_connection_updated: '关系变更同步',
 };
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {
@@ -77,6 +80,7 @@ function getActionPrefix(action: AuditAction): string {
   if (action.startsWith('delete') || action.startsWith('remove')) return 'delete';
   if (action.startsWith('assign')) return 'assign';
   if (action.startsWith('complete') || action.startsWith('link')) return 'status';
+  if (action.startsWith('sync')) return 'status';
   if (action.startsWith('change_status')) return 'status';
   if (action.startsWith('restore')) return 'update';
   return 'update';
