@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { caseTemplateApi } from '@/api/caseTemplateApi';
 import { useCaseStore } from '@/store/useCaseStore';
-import { useInvestigationTaskStore } from '@/store/useInvestigationTaskStore';
 import type {
   CaseTemplate,
   ApplyTemplateDto,
@@ -91,35 +90,25 @@ export const useCaseTemplateStore = create<CaseTemplateState>((set, get) => ({
   loadAppliedTemplateForCase: async (caseId, templateId) => {
     set({ loading: true, error: null });
     try {
-      const [templateResponse, caseState, tasks] = await Promise.all([
-        caseTemplateApi.getById(templateId),
-        Promise.resolve().then(() => {
-          const state = useCaseStore.getState();
-          return {
-            case: state.currentCase,
-            evidence: state.currentCase?.evidence ?? [],
-            connections: state.currentCase?.connections ?? [],
-          };
-        }),
-        Promise.resolve().then(() => {
-          const state = useInvestigationTaskStore.getState();
-          return state.tasks;
-        }),
-      ]);
+      const templateResponse = await caseTemplateApi.getById(templateId);
 
-      if (templateResponse.success && templateResponse.data && caseState.case) {
-        const appliedData: ApplyTemplateResult = {
-          case: caseState.case,
-          template: templateResponse.data,
-          evidenceFields: templateResponse.data.evidenceFields,
-          relationTypes: templateResponse.data.relationTypes,
-          investigationSteps: templateResponse.data.investigationSteps,
-          createdTasks: tasks,
-        };
-        set({
-          appliedTemplateData: appliedData,
-          currentTemplate: templateResponse.data,
-        });
+      if (templateResponse.success && templateResponse.data) {
+        const currentCase = useCaseStore.getState().currentCase;
+        
+        if (currentCase) {
+          const appliedData: ApplyTemplateResult = {
+            case: currentCase,
+            template: templateResponse.data,
+            evidenceFields: templateResponse.data.evidenceFields,
+            relationTypes: templateResponse.data.relationTypes,
+            investigationSteps: templateResponse.data.investigationSteps,
+            createdTasks: [],
+          };
+          set({
+            appliedTemplateData: appliedData,
+            currentTemplate: templateResponse.data,
+          });
+        }
       } else {
         set({ error: templateResponse.error || 'Failed to load applied template' });
       }
