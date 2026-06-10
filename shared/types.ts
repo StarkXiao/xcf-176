@@ -532,6 +532,86 @@ export interface UpdateReportDto {
   exportFormat?: ReportExportFormat;
 }
 
+export type CaseTemplateCategory = 'fraud' | 'penetration' | 'ransomware' | 'data_breach' | 'other';
+
+export interface TemplateEvidenceField {
+  id: string;
+  name: string;
+  label: string;
+  description?: string;
+  dataType: 'text' | 'longtext' | 'date' | 'url' | 'file' | 'number';
+  required: boolean;
+  defaultValue?: string;
+  placeholder?: string;
+}
+
+export interface TemplateRelationType {
+  id: string;
+  label: string;
+  description?: string;
+  color: string;
+  lineStyle: 'solid' | 'dashed' | 'dotted';
+  fromTypes: string[];
+  toTypes: string[];
+}
+
+export interface TemplateInvestigationStep {
+  id: string;
+  title: string;
+  description: string;
+  priority: InvestigationTaskPriority;
+  order: number;
+  dependsOn?: string[];
+  evidenceFieldIds?: string[];
+}
+
+export interface CaseTemplate {
+  id: string;
+  name: string;
+  category: CaseTemplateCategory;
+  description: string;
+  icon?: string;
+  color: string;
+  evidenceFields: TemplateEvidenceField[];
+  relationTypes: TemplateRelationType[];
+  investigationSteps: TemplateInvestigationStep[];
+  defaultTags: string[];
+  isBuiltIn: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCaseTemplateDto {
+  name: string;
+  category: CaseTemplateCategory;
+  description?: string;
+  icon?: string;
+  color?: string;
+  evidenceFields?: TemplateEvidenceField[];
+  relationTypes?: TemplateRelationType[];
+  investigationSteps?: TemplateInvestigationStep[];
+  defaultTags?: string[];
+}
+
+export interface UpdateCaseTemplateDto {
+  name?: string;
+  category?: CaseTemplateCategory;
+  description?: string;
+  icon?: string;
+  color?: string;
+  evidenceFields?: TemplateEvidenceField[];
+  relationTypes?: TemplateRelationType[];
+  investigationSteps?: TemplateInvestigationStep[];
+  defaultTags?: string[];
+}
+
+export interface ApplyTemplateDto {
+  templateId: string;
+  caseName: string;
+  caseDescription?: string;
+  createdBy: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;

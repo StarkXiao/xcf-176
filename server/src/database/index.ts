@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { Case, Evidence, Connection, Collaborator } from '@shared/types';
+import { builtInTemplates } from '../data/builtInTemplates.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -228,6 +229,25 @@ const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_investigation_tasks_status ON investigation_tasks(status);
     CREATE INDEX IF NOT EXISTS idx_investigation_tasks_assignee_id ON investigation_tasks(assignee_id);
     CREATE INDEX IF NOT EXISTS idx_investigation_tasks_deadline ON investigation_tasks(deadline);
+
+    CREATE TABLE IF NOT EXISTS case_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'other',
+      description TEXT DEFAULT '',
+      icon TEXT,
+      color TEXT DEFAULT '#3b82f6',
+      evidence_fields TEXT DEFAULT '[]',
+      relation_types TEXT DEFAULT '[]',
+      investigation_steps TEXT DEFAULT '[]',
+      default_tags TEXT DEFAULT '[]',
+      is_built_in INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_case_templates_category ON case_templates(category);
+    CREATE INDEX IF NOT EXISTS idx_case_templates_built_in ON case_templates(is_built_in);
   `);
 };
 
@@ -809,8 +829,41 @@ const seedData = () => {
   }
 };
 
+const seedTemplates = () => {
+  const templateCount = db.prepare('SELECT COUNT(*) as count FROM case_templates').get() as { count: number };
+  if (templateCount.count > 0) return;
+
+  const insertTemplate = db.prepare(`
+    INSERT INTO case_templates (
+      id, name, category, description, icon, color,
+      evidence_fields, relation_types, investigation_steps, default_tags,
+      is_built_in, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const now = new Date().toISOString();
+  for (const tpl of builtInTemplates) {
+    insertTemplate.run(
+      tpl.id,
+      tpl.name,
+      tpl.category,
+      tpl.description ?? null,
+      tpl.icon ?? null,
+      tpl.color ?? '#3b82f6',
+      JSON.stringify(tpl.evidenceFields ?? []),
+      JSON.stringify(tpl.relationTypes ?? []),
+      JSON.stringify(tpl.investigationSteps ?? []),
+      JSON.stringify(tpl.defaultTags ?? []),
+      1,
+      now,
+      now
+    );
+  }
+};
+
 createTables();
 runMigrations();
 seedData();
+seedTemplates();
 
 export default db;
