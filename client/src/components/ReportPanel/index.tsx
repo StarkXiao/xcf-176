@@ -26,6 +26,9 @@ const STATUS_LABELS: Record<string, string> = {
   generating: '生成中',
   completed: '已完成',
   exported: '已导出',
+  pending: '待处理',
+  in_progress: '进行中',
+  reviewed: '已审核',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -33,6 +36,9 @@ const STATUS_COLORS: Record<string, string> = {
   generating: CYBERPUNK_COLORS.accentYellow,
   completed: CYBERPUNK_COLORS.accentGreen,
   exported: CYBERPUNK_COLORS.accentCyan,
+  pending: CYBERPUNK_COLORS.accentYellow,
+  in_progress: CYBERPUNK_COLORS.accentCyan,
+  reviewed: CYBERPUNK_COLORS.accentPurple,
 };
 
 const IMPORTANCE_LABELS: Record<string, string> = {
