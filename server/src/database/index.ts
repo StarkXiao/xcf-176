@@ -203,6 +203,27 @@ const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_consultation_discussions_consultation_id ON consultation_discussions(consultation_id);
     CREATE INDEX IF NOT EXISTS idx_consultation_conclusions_consultation_id ON consultation_conclusions(consultation_id);
     CREATE INDEX IF NOT EXISTS idx_consultation_disputes_consultation_id ON consultation_disputes(consultation_id);
+    CREATE TABLE IF NOT EXISTS reports (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft',
+      case_summary TEXT NOT NULL DEFAULT '{}',
+      relationship_graph TEXT NOT NULL DEFAULT '{}',
+      timeline TEXT NOT NULL DEFAULT '[]',
+      task_summaries TEXT NOT NULL DEFAULT '[]',
+      export_format TEXT NOT NULL DEFAULT 'json',
+      exported_content TEXT,
+      generated_at TEXT,
+      exported_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_reports_case_id ON reports(case_id);
+    CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
+
     CREATE INDEX IF NOT EXISTS idx_investigation_tasks_case_id ON investigation_tasks(case_id);
     CREATE INDEX IF NOT EXISTS idx_investigation_tasks_status ON investigation_tasks(status);
     CREATE INDEX IF NOT EXISTS idx_investigation_tasks_assignee_id ON investigation_tasks(assignee_id);

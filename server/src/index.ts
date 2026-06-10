@@ -9,6 +9,7 @@ import { evidenceCollectionRoutes } from './routes/evidenceCollectionRoutes.js';
 import { consultationRoutes } from './routes/consultationRoutes.js';
 import { traceAnalysisRoutes } from './routes/traceAnalysisRoutes.js';
 import { investigationTaskRoutes } from './routes/investigationTaskRoutes.js';
+import { reportRoutes } from './routes/reportRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { PersistenceService } from './services/PersistenceService.js';
 
@@ -30,6 +31,7 @@ server.register(evidenceCollectionRoutes, { prefix: '/api/evidence-collection' }
 server.register(consultationRoutes, { prefix: '/api/consultations' });
 server.register(traceAnalysisRoutes, { prefix: '/api/trace-analysis' });
 server.register(investigationTaskRoutes, { prefix: '/api/investigation-tasks' });
+server.register(reportRoutes, { prefix: '/api/reports' });
 
 const start = async () => {
   try {

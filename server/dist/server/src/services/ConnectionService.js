@@ -22,13 +22,13 @@ export const ConnectionService = {
         if (updated && existing) {
             const changes = [];
             if (dto.label !== undefined && dto.label !== existing.label) {
-                changes.push(`标签: ${existing.label} → ${dto.label}`);
+                changes.push({ field: 'label', oldValue: existing.label, newValue: dto.label });
             }
             if (dto.lineStyle !== undefined && dto.lineStyle !== existing.lineStyle) {
-                changes.push(`线型: ${existing.lineStyle} → ${dto.lineStyle}`);
+                changes.push({ field: 'lineStyle', oldValue: existing.lineStyle, newValue: dto.lineStyle });
             }
             if (changes.length > 0) {
-                InvestigationTaskService.onConnectionUpdated(id, changes.join(', '));
+                InvestigationTaskService.onConnectionUpdated(id, changes);
             }
         }
         return updated;

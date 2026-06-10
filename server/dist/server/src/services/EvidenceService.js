@@ -45,16 +45,16 @@ export const EvidenceService = {
         if (updated && existing) {
             const changes = [];
             if (dto.content !== undefined && dto.content !== existing.content) {
-                changes.push(`内容变更`);
+                changes.push({ field: 'content', oldValue: existing.content.slice(0, 20), newValue: dto.content.slice(0, 20) });
             }
             if (dto.importance !== undefined && dto.importance !== existing.importance) {
-                changes.push(`重要性: ${existing.importance} → ${dto.importance}`);
+                changes.push({ field: 'importance', oldValue: existing.importance, newValue: dto.importance });
             }
             if (dto.status !== undefined && dto.status !== existing.status) {
-                changes.push(`状态: ${existing.status} → ${dto.status}`);
+                changes.push({ field: 'status', oldValue: existing.status, newValue: dto.status });
             }
             if (changes.length > 0) {
-                InvestigationTaskService.onEvidenceUpdated(id, changes.join(', '));
+                InvestigationTaskService.onEvidenceUpdated(id, changes);
             }
         }
         return updated;

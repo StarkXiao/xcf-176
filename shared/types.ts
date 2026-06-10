@@ -445,6 +445,93 @@ export interface UpdateInvestigationTaskDto {
   syncNotes?: InvestigationTaskSyncNote[];
 }
 
+export type ReportStatus = 'draft' | 'generating' | 'completed' | 'exported';
+export type ReportExportFormat = 'json' | 'html' | 'markdown';
+
+export interface ReportEvidenceSummary {
+  id: string;
+  content: string;
+  source: string;
+  importance: Evidence['importance'];
+  tags: string[];
+  status: TaskStatus;
+  timestamp: string;
+  assignedTo: string | null;
+}
+
+export interface ReportRelationshipEdge {
+  fromEvidenceId: string;
+  toEvidenceId: string;
+  label: string;
+  fromContent: string;
+  toContent: string;
+}
+
+export interface ReportRelationshipGraph {
+  nodes: ReportEvidenceSummary[];
+  edges: ReportRelationshipEdge[];
+}
+
+export interface ReportTimelineEntry {
+  timestamp: string;
+  type: 'evidence' | 'connection' | 'audit' | 'task';
+  title: string;
+  description: string;
+  referenceId: string;
+}
+
+export interface ReportTaskSummary {
+  id: string;
+  title: string;
+  priority: InvestigationTaskPriority;
+  status: InvestigationTaskStatus;
+  assigneeName: string | null;
+  deadline: string | null;
+}
+
+export interface ReportCaseSummary {
+  caseId: string;
+  caseName: string;
+  caseDescription: string;
+  caseStatus: TaskStatus;
+  keyClues: string[];
+  totalEvidence: number;
+  totalConnections: number;
+  totalTasks: number;
+  evidenceByImportance: Record<Evidence['importance'], number>;
+  evidenceByStatus: Record<TaskStatus, number>;
+  collaborators: Array<{ id: string; name: string; role: string }>;
+}
+
+export interface Report {
+  id: string;
+  caseId: string;
+  title: string;
+  status: ReportStatus;
+  caseSummary: ReportCaseSummary;
+  relationshipGraph: ReportRelationshipGraph;
+  timeline: ReportTimelineEntry[];
+  taskSummaries: ReportTaskSummary[];
+  exportFormat: ReportExportFormat;
+  exportedContent: string | null;
+  generatedAt: string | null;
+  exportedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateReportDto {
+  caseId: string;
+  title?: string;
+  exportFormat?: ReportExportFormat;
+}
+
+export interface UpdateReportDto {
+  title?: string;
+  status?: ReportStatus;
+  exportFormat?: ReportExportFormat;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;

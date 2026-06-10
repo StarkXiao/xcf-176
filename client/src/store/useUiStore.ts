@@ -13,6 +13,7 @@ interface UiState {
   consultationPanelOpen: boolean;
   traceAnalysisPanelOpen: boolean;
   investigationTaskPanelOpen: boolean;
+  reportPanelOpen: boolean;
   saveStatus: SaveStatus;
   lastSaved: Date | null;
   currentTime: string;
@@ -37,6 +38,8 @@ interface UiState {
   setTraceAnalysisPanelOpen: (open: boolean) => void;
   toggleInvestigationTaskPanel: () => void;
   setInvestigationTaskPanelOpen: (open: boolean) => void;
+  toggleReportPanel: () => void;
+  setReportPanelOpen: (open: boolean) => void;
   setSaveStatus: (status: SaveStatus) => void;
   updateLastSaved: () => void;
   updateCurrentTime: () => void;
@@ -54,6 +57,7 @@ export const useUiStore = create<UiState>((set) => ({
   consultationPanelOpen: false,
   traceAnalysisPanelOpen: false,
   investigationTaskPanelOpen: false,
+  reportPanelOpen: false,
   saveStatus: 'idle',
   lastSaved: null,
   currentTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
@@ -88,6 +92,9 @@ export const useUiStore = create<UiState>((set) => ({
 
   toggleInvestigationTaskPanel: () => set((state) => ({ investigationTaskPanelOpen: !state.investigationTaskPanelOpen })),
   setInvestigationTaskPanelOpen: (open) => set({ investigationTaskPanelOpen: open }),
+
+  toggleReportPanel: () => set((state) => ({ reportPanelOpen: !state.reportPanelOpen })),
+  setReportPanelOpen: (open) => set({ reportPanelOpen: open }),
 
   setSaveStatus: (status) => set({ saveStatus: status }),
 
