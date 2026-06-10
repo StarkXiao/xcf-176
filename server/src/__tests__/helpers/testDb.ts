@@ -113,6 +113,25 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_investigation_tasks_case_id ON investigation_tasks(case_id);
   CREATE INDEX IF NOT EXISTS idx_investigation_tasks_status ON investigation_tasks(status);
   CREATE INDEX IF NOT EXISTS idx_investigation_tasks_assignee_id ON investigation_tasks(assignee_id);
+  CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    case_summary TEXT NOT NULL DEFAULT '{}',
+    relationship_graph TEXT NOT NULL DEFAULT '{}',
+    timeline TEXT NOT NULL DEFAULT '[]',
+    task_summaries TEXT NOT NULL DEFAULT '[]',
+    export_format TEXT NOT NULL DEFAULT 'json',
+    exported_content TEXT,
+    generated_at TEXT,
+    exported_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_reports_case_id ON reports(case_id);
+  CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
 `;
 
 let _db: Database.Database | null = null;
@@ -133,6 +152,7 @@ export function resetTestDb(): void {
     DELETE FROM audit_logs;
     DELETE FROM evidence_collection;
     DELETE FROM investigation_tasks;
+    DELETE FROM reports;
     DELETE FROM evidence;
     DELETE FROM connections;
     DELETE FROM collaborators;
@@ -157,5 +177,136 @@ export function seedTestCollaborators(
     db.prepare(
       "INSERT OR IGNORE INTO collaborators (id, case_id, name, role, color, created_at) VALUES (?, ?, ?, ?, ?, ?)"
     ).run(c.id, caseId, c.name, c.role, c.color, now);
+  }
+}
+
+export function seedTestEvidence(
+  db: Database.Database,
+  caseId: string,
+  evidence: Array<{
+    id: string;
+    content: string;
+    source: string;
+    importance: string;
+    tags: string[];
+    status: string;
+    timestamp?: string;
+    assignedTo?: string;
+  }>
+): void {
+  const now = new Date().toISOString();
+  for (const e of evidence) {
+    db.prepare(
+      "INSERT OR IGNORE INTO evidence (id, case_id, content, source, importance, tags, status, timestamp, assigned_to, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      e.id,
+      caseId,
+      e.content,
+      e.source,
+      e.importance,
+      JSON.stringify(e.tags),
+      e.status,
+      e.timestamp ?? now,
+      e.assignedTo ?? null,
+      now
+    );
+  }
+}
+
+export function seedTestConnection(
+  db: Database.Database,
+  caseId: string,
+  connections: Array<{
+    id: string;
+    fromEvidenceId: string;
+    toEvidenceId: string;
+    label: string;
+  }>
+): void {
+  const now = new Date().toISOString();
+  for (const c of connections) {
+    db.prepare(
+      "INSERT OR IGNORE INTO connections (id, case_id, from_evidence_id, to_evidence_id, label, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(c.id, caseId, c.fromEvidenceId, c.toEvidenceId, c.label, now);
+  }
+}
+
+export function seedTestInvestigationTask(
+  db: Database.Database,
+  caseId: string,
+  tasks: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    priority: string;
+    status: string;
+    assigneeId?: string;
+    assigneeName?: string;
+    deadline?: string;
+    createdBy: string;
+    createdByName: string;
+  }>
+): void {
+  const now = new Date().toISOString();
+  for (const t of tasks) {
+    db.prepare(
+      "INSERT OR IGNORE INTO investigation_tasks (id, case_id, title, description, priority, status, assignee_id, assignee_name, deadline, created_by, created_by_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      t.id,
+      caseId,
+      t.title,
+      t.description ?? '',
+      t.priority,
+      t.status,
+      t.assigneeId ?? null,
+      t.assigneeName ?? null,
+      t.deadline ?? null,
+      t.createdBy,
+      t.createdByName,
+      now,
+      now
+    );
+  }
+}
+
+export function updateCaseKeyClues(
+  db: Database.Database,
+  caseId: string,
+  keyClues: string[]
+): void {
+  db.prepare("UPDATE cases SET key_clues = ?, status = 'in_progress' WHERE id = ?").run(
+    JSON.stringify(keyClues),
+    caseId
+  );
+}
+
+export function seedTestAuditLog(
+  db: Database.Database,
+  caseId: string,
+  logs: Array<{
+    id: string;
+    collaboratorId: string;
+    collaboratorName: string;
+    action: string;
+    targetType: string;
+    targetId: string;
+    detail: string;
+  }>
+): void {
+  const now = new Date().toISOString();
+  for (const log of logs) {
+    db.prepare(
+      "INSERT OR IGNORE INTO audit_logs (id, case_id, collaborator_id, collaborator_name, action, target_type, target_id, detail, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      log.id,
+      caseId,
+      log.collaboratorId,
+      log.collaboratorName,
+      log.action,
+      log.targetType,
+      log.targetId,
+      log.detail,
+      now
+    );
   }
 }

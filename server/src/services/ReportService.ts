@@ -282,6 +282,7 @@ function generateHtmlExport(report: Report): string {
   };
 
   let html = `<!DOCTYPE html>
+<!-- cyberpunk style report -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -455,8 +456,20 @@ export const ReportService = {
     const report = ReportRepository.findById(id);
     if (!report) return null;
 
-    let content: string;
+    let validFormat: ReportExportFormat;
     switch (format) {
+      case 'markdown':
+      case 'html':
+        validFormat = format;
+        break;
+      case 'json':
+      default:
+        validFormat = 'json';
+        break;
+    }
+
+    let content: string;
+    switch (validFormat) {
       case 'markdown':
         content = generateMarkdownExport(report);
         break;
@@ -469,7 +482,7 @@ export const ReportService = {
         break;
     }
 
-    return ReportRepository.updateExportedContent(id, content, format);
+    return ReportRepository.updateExportedContent(id, content, validFormat);
   },
 
   deleteReport: (id: string): boolean => {
