@@ -1,5 +1,6 @@
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
 import { InvestigationTaskService } from './InvestigationTaskService.js';
+import { AnomalyAlertService } from './AnomalyAlertService.js';
 import type { Connection, CreateConnectionDto, SyncSourceChange } from '@shared/types';
 
 export interface UpdateConnectionDto {
@@ -26,7 +27,9 @@ export const ConnectionService = {
   },
 
   createConnection: (dto: CreateConnectionDto): Connection => {
-    return ConnectionRepository.create(dto);
+    const connection = ConnectionRepository.create(dto);
+    AnomalyAlertService.runDetectionForCase(dto.caseId);
+    return connection;
   },
 
   updateConnection: (id: string, dto: UpdateConnectionDto): Connection | null => {
@@ -43,12 +46,19 @@ export const ConnectionService = {
       if (changes.length > 0) {
         InvestigationTaskService.onConnectionUpdated(id, changes);
       }
+      AnomalyAlertService.runDetectionForCase(updated.caseId);
     }
     return updated;
   },
 
   deleteConnection: (id: string): boolean => {
-    return ConnectionRepository.delete(id);
+    const existing = ConnectionRepository.findById(id);
+    const caseId = existing?.caseId;
+    const deleted = ConnectionRepository.delete(id);
+    if (deleted && caseId) {
+      AnomalyAlertService.runDetectionForCase(caseId);
+    }
+    return deleted;
   },
 
   deleteConnectionsByCaseId: (caseId: string): number => {

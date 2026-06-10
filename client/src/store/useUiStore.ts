@@ -15,6 +15,7 @@ interface UiState {
   traceAnalysisPanelOpen: boolean;
   investigationTaskPanelOpen: boolean;
   reportPanelOpen: boolean;
+  anomalyAlertPanelOpen: boolean;
   saveStatus: SaveStatus;
   lastSaved: Date | null;
   currentTime: string;
@@ -42,6 +43,8 @@ interface UiState {
   setInvestigationTaskPanelOpen: (open: boolean) => void;
   toggleReportPanel: () => void;
   setReportPanelOpen: (open: boolean) => void;
+  toggleAnomalyAlertPanel: () => void;
+  setAnomalyAlertPanelOpen: (open: boolean) => void;
   setSaveStatus: (status: SaveStatus) => void;
   updateLastSaved: () => void;
   updateCurrentTime: () => void;
@@ -61,6 +64,7 @@ export const useUiStore = create<UiState>((set) => ({
   traceAnalysisPanelOpen: false,
   investigationTaskPanelOpen: false,
   reportPanelOpen: false,
+  anomalyAlertPanelOpen: false,
   saveStatus: 'idle',
   lastSaved: null,
   currentTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
@@ -99,6 +103,9 @@ export const useUiStore = create<UiState>((set) => ({
 
   toggleReportPanel: () => set((state) => ({ reportPanelOpen: !state.reportPanelOpen })),
   setReportPanelOpen: (open) => set({ reportPanelOpen: open }),
+
+  toggleAnomalyAlertPanel: () => set((state) => ({ anomalyAlertPanelOpen: !state.anomalyAlertPanelOpen })),
+  setAnomalyAlertPanelOpen: (open) => set({ anomalyAlertPanelOpen: open }),
 
   setSaveStatus: (status) => set({ saveStatus: status }),
 

@@ -17,6 +17,7 @@ import {
   GitBranch,
   ClipboardList,
   FileText,
+  AlertTriangle,
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -44,6 +45,7 @@ export const Toolbar: React.FC = () => {
   const toggleConsultationPanel = useUiStore((state) => state.toggleConsultationPanel);
   const toggleTraceAnalysisPanel = useUiStore((state) => state.toggleTraceAnalysisPanel);
   const toggleInvestigationTaskPanel = useUiStore((state) => state.toggleInvestigationTaskPanel);
+  const toggleAnomalyAlertPanel = useUiStore((state) => state.toggleAnomalyAlertPanel);
   const toggleReportPanel = useUiStore((state) => state.toggleReportPanel);
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const propertyPanelOpen = useUiStore((state) => state.propertyPanelOpen);
@@ -54,6 +56,7 @@ export const Toolbar: React.FC = () => {
   const consultationPanelOpen = useUiStore((state) => state.consultationPanelOpen);
   const traceAnalysisPanelOpen = useUiStore((state) => state.traceAnalysisPanelOpen);
   const investigationTaskPanelOpen = useUiStore((state) => state.investigationTaskPanelOpen);
+  const anomalyAlertPanelOpen = useUiStore((state) => state.anomalyAlertPanelOpen);
   const reportPanelOpen = useUiStore((state) => state.reportPanelOpen);
   const { forceSave } = useDebouncedSave();
 
@@ -272,6 +275,13 @@ export const Toolbar: React.FC = () => {
           icon={<ClipboardList size={16} />}
           onClick={toggleInvestigationTaskPanel}
           glow={investigationTaskPanelOpen}
+        />
+        <NeonButton
+          size="sm"
+          variant="danger"
+          icon={<AlertTriangle size={16} />}
+          onClick={toggleAnomalyAlertPanel}
+          glow={anomalyAlertPanelOpen}
         />
         <NeonButton
           size="sm"

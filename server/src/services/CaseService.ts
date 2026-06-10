@@ -2,6 +2,8 @@ import { CaseRepository } from '../repositories/CaseRepository.js';
 import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
 import { CollaboratorRepository } from '../repositories/CollaboratorRepository.js';
+import { AnomalyAlertRepository } from '../repositories/AnomalyAlertRepository.js';
+import { AnomalyAlertService } from './AnomalyAlertService.js';
 import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto } from '@shared/types';
 
 export const CaseService = {
@@ -34,12 +36,17 @@ export const CaseService = {
   },
 
   updateCase: (id: string, dto: UpdateCaseDto): Case | null => {
-    return CaseRepository.update(id, dto);
+    const updated = CaseRepository.update(id, dto);
+    if (updated) {
+      AnomalyAlertService.runDetectionForCase(id);
+    }
+    return updated;
   },
 
   deleteCase: (id: string): boolean => {
     ConnectionRepository.deleteByCaseId(id);
     EvidenceRepository.deleteByCaseId(id);
+    AnomalyAlertRepository.deleteByCaseId(id);
     return CaseRepository.delete(id);
   },
 };

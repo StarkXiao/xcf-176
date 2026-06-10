@@ -1,6 +1,7 @@
 import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
 import { InvestigationTaskService } from './InvestigationTaskService.js';
+import { AnomalyAlertService } from './AnomalyAlertService.js';
 import type { Evidence, CreateEvidenceDto, UpdateEvidenceDto, SearchFilter, SyncSourceChange } from '@shared/types';
 
 export const EvidenceService = {
@@ -52,7 +53,9 @@ export const EvidenceService = {
   },
 
   createEvidence: (dto: CreateEvidenceDto): Evidence => {
-    return EvidenceRepository.create(dto);
+    const evidence = EvidenceRepository.create(dto);
+    AnomalyAlertService.runDetectionForCase(dto.caseId);
+    return evidence;
   },
 
   updateEvidence: (id: string, dto: UpdateEvidenceDto): Evidence | null => {
@@ -72,13 +75,20 @@ export const EvidenceService = {
       if (changes.length > 0) {
         InvestigationTaskService.onEvidenceUpdated(id, changes);
       }
+      AnomalyAlertService.runDetectionForCase(updated.caseId);
     }
     return updated;
   },
 
   deleteEvidence: (id: string): boolean => {
+    const existing = EvidenceRepository.findById(id);
+    const caseId = existing?.caseId;
     ConnectionRepository.deleteByEvidenceId(id);
-    return EvidenceRepository.delete(id);
+    const deleted = EvidenceRepository.delete(id);
+    if (deleted && caseId) {
+      AnomalyAlertService.runDetectionForCase(caseId);
+    }
+    return deleted;
   },
 
   getAllTags: (caseId: string): string[] => {
