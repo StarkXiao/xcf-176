@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   MessageSquare,
   GitBranch,
+  ClipboardList,
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -40,6 +41,7 @@ export const Toolbar: React.FC = () => {
   const toggleEvidenceCollectionPanel = useUiStore((state) => state.toggleEvidenceCollectionPanel);
   const toggleConsultationPanel = useUiStore((state) => state.toggleConsultationPanel);
   const toggleTraceAnalysisPanel = useUiStore((state) => state.toggleTraceAnalysisPanel);
+  const toggleInvestigationTaskPanel = useUiStore((state) => state.toggleInvestigationTaskPanel);
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const propertyPanelOpen = useUiStore((state) => state.propertyPanelOpen);
   const collaboratorPanelOpen = useUiStore((state) => state.collaboratorPanelOpen);
@@ -48,6 +50,7 @@ export const Toolbar: React.FC = () => {
   const evidenceCollectionPanelOpen = useUiStore((state) => state.evidenceCollectionPanelOpen);
   const consultationPanelOpen = useUiStore((state) => state.consultationPanelOpen);
   const traceAnalysisPanelOpen = useUiStore((state) => state.traceAnalysisPanelOpen);
+  const investigationTaskPanelOpen = useUiStore((state) => state.investigationTaskPanelOpen);
   const { forceSave } = useDebouncedSave();
 
   useEffect(() => {
@@ -251,6 +254,13 @@ export const Toolbar: React.FC = () => {
           icon={<ShieldCheck size={16} />}
           onClick={toggleEvidenceCollectionPanel}
           glow={evidenceCollectionPanelOpen}
+        />
+        <NeonButton
+          size="sm"
+          variant="primary"
+          icon={<ClipboardList size={16} />}
+          onClick={toggleInvestigationTaskPanel}
+          glow={investigationTaskPanelOpen}
         />
         <NeonButton
           size="sm"

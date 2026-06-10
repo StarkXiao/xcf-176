@@ -37,6 +37,13 @@ const ACTION_LABELS: { [key in AuditAction]: string } = {
   add_conclusion: '形成结论',
   raise_dispute: '提出争议',
   resolve_dispute: '解决争议',
+  create_investigation_task: '创建任务',
+  update_investigation_task: '更新任务',
+  assign_investigation_task: '分配任务',
+  complete_investigation_task: '完成任务',
+  link_evidence_to_task: '关联证据',
+  link_collection_to_task: '关联采集',
+  link_connection_to_task: '关联关系',
 };
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {
@@ -69,6 +76,7 @@ function getActionPrefix(action: AuditAction): string {
   if (action.startsWith('update') || action.startsWith('change_status')) return 'update';
   if (action.startsWith('delete') || action.startsWith('remove')) return 'delete';
   if (action.startsWith('assign')) return 'assign';
+  if (action.startsWith('complete') || action.startsWith('link')) return 'status';
   if (action.startsWith('change_status')) return 'status';
   if (action.startsWith('restore')) return 'update';
   return 'update';

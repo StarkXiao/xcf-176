@@ -89,6 +89,29 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_evidence_collection_status ON evidence_collection(verification_status);
   CREATE INDEX IF NOT EXISTS idx_evidence_case_id ON evidence(case_id);
   CREATE INDEX IF NOT EXISTS idx_audit_logs_case_id ON audit_logs(case_id);
+  CREATE TABLE IF NOT EXISTS investigation_tasks (
+    id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    priority TEXT NOT NULL DEFAULT 'normal',
+    status TEXT NOT NULL DEFAULT 'pending',
+    assignee_id TEXT,
+    assignee_name TEXT DEFAULT NULL,
+    deadline TEXT,
+    evidence_ids TEXT DEFAULT '[]',
+    collection_item_ids TEXT DEFAULT '[]',
+    connection_ids TEXT DEFAULT '[]',
+    created_by TEXT NOT NULL,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    completed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_investigation_tasks_case_id ON investigation_tasks(case_id);
+  CREATE INDEX IF NOT EXISTS idx_investigation_tasks_status ON investigation_tasks(status);
+  CREATE INDEX IF NOT EXISTS idx_investigation_tasks_assignee_id ON investigation_tasks(assignee_id);
 `;
 
 let _db: Database.Database | null = null;
@@ -108,6 +131,7 @@ export function resetTestDb(): void {
   db.exec(`
     DELETE FROM audit_logs;
     DELETE FROM evidence_collection;
+    DELETE FROM investigation_tasks;
     DELETE FROM evidence;
     DELETE FROM connections;
     DELETE FROM collaborators;

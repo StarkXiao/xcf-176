@@ -10,6 +10,7 @@ import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { EvidenceCollectionPanel } from '@/components/EvidenceCollectionPanel';
 import { ConsultationPanel } from '@/components/ConsultationPanel';
 import { TraceAnalysisPanel } from '@/components/TraceAnalysisPanel';
+import { InvestigationTaskPanel } from '@/components/InvestigationTaskPanel';
 import { ScanlineEffect } from '@/components/ui/ScanlineEffect';
 import { useUiStore } from '@/store/useUiStore';
 import { useCaseStore } from '@/store/useCaseStore';
@@ -28,6 +29,7 @@ const Home: React.FC = () => {
   const evidenceCollectionPanelOpen = useUiStore((state) => state.evidenceCollectionPanelOpen);
   const consultationPanelOpen = useUiStore((state) => state.consultationPanelOpen);
   const traceAnalysisPanelOpen = useUiStore((state) => state.traceAnalysisPanelOpen);
+  const investigationTaskPanelOpen = useUiStore((state) => state.investigationTaskPanelOpen);
   const loadCollaborators = useCollaboratorStore((state) => state.loadCollaborators);
   const loadAuditLogs = useAuditLogStore((state) => state.loadAuditLogs);
 
@@ -62,6 +64,7 @@ const Home: React.FC = () => {
         {evidenceCollectionPanelOpen && <EvidenceCollectionPanel />}
         {consultationPanelOpen && <ConsultationPanel />}
         {traceAnalysisPanelOpen && <TraceAnalysisPanel />}
+        {investigationTaskPanelOpen && <InvestigationTaskPanel />}
         <PropertyPanel />
       </div>
 

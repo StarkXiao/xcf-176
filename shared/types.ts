@@ -199,7 +199,14 @@ export type AuditAction =
   | 'add_discussion'
   | 'add_conclusion'
   | 'raise_dispute'
-  | 'resolve_dispute';
+  | 'resolve_dispute'
+  | 'create_investigation_task'
+  | 'update_investigation_task'
+  | 'assign_investigation_task'
+  | 'complete_investigation_task'
+  | 'link_evidence_to_task'
+  | 'link_collection_to_task'
+  | 'link_connection_to_task';
 
 export interface AuditLog {
   id: string;
@@ -365,6 +372,54 @@ export interface TraceEdge {
 export interface TraceGraph {
   nodes: TraceNode[];
   edges: TraceEdge[];
+}
+
+export type InvestigationTaskPriority = 'low' | 'normal' | 'high' | 'critical';
+export type InvestigationTaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface InvestigationTask {
+  id: string;
+  caseId: string;
+  title: string;
+  description: string;
+  priority: InvestigationTaskPriority;
+  status: InvestigationTaskStatus;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  deadline: string | null;
+  evidenceIds: string[];
+  collectionItemIds: string[];
+  connectionIds: string[];
+  createdBy: string;
+  createdByName: string;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInvestigationTaskDto {
+  caseId: string;
+  title: string;
+  description?: string;
+  priority?: InvestigationTaskPriority;
+  assigneeId?: string | null;
+  deadline?: string | null;
+  evidenceIds?: string[];
+  collectionItemIds?: string[];
+  connectionIds?: string[];
+  createdBy: string;
+}
+
+export interface UpdateInvestigationTaskDto {
+  title?: string;
+  description?: string;
+  priority?: InvestigationTaskPriority;
+  status?: InvestigationTaskStatus;
+  assigneeId?: string | null;
+  deadline?: string | null;
+  evidenceIds?: string[];
+  collectionItemIds?: string[];
+  connectionIds?: string[];
 }
 
 export interface ApiResponse<T> {
