@@ -47,6 +47,7 @@ const ACTION_LABELS: { [key in AuditAction]: string } = {
   sync_collection_archived: '采集归档同步',
   sync_evidence_updated: '证据变更同步',
   sync_connection_updated: '关系变更同步',
+  sync_priority_escalated: '优先级升级同步',
 };
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {

@@ -10,6 +10,7 @@ import { InvestigationTaskRepository } from '../repositories/InvestigationTaskRe
 import { AuditLogRepository } from '../repositories/AuditLogRepository.js';
 import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
 import { EvidenceCollectionRepository } from '../repositories/EvidenceCollectionRepository.js';
+import type { SyncSourceChange } from '@shared/types';
 
 const CASE_ID = 'test-case-001';
 const COL_A_ID = 'test-col-001';
@@ -362,6 +363,7 @@ describe('InvestigationTaskService - 同步引擎: 采集项归档', () => {
     expect(updated.syncNotes[0].sourceType).toBe('collection_archived');
     expect(updated.syncNotes[0].sourceId).toBe('col-sync-001');
     expect(updated.syncNotes[0].detail).toContain('待归档采集项');
+    expect(updated.syncNotes[0].impact).toBe('info_only');
 
     const logs = getAuditLogsByAction('sync_collection_archived');
     expect(logs).toHaveLength(1);
@@ -386,7 +388,7 @@ describe('InvestigationTaskService - 同步引擎: 采集项归档', () => {
     expect(updatedTasks).toHaveLength(0);
   });
 
-  it('所有关联采集项归档后pending任务应自动推进为in_progress', () => {
+  it('所有关联采集项归档后pending任务应自动推进为in_progress且impact为status_advanced', () => {
     seedCollectionItem('col-all-001', CASE_ID, '采集项1');
     archiveCollectionItem('col-all-001', 'ev-old-001');
 
@@ -397,14 +399,32 @@ describe('InvestigationTaskService - 同步引擎: 采集项归档', () => {
       createdBy: COL_A_ID,
     });
 
-    const updatedTasks = InvestigationTaskService.onCollectionArchived('col-all-001', 'ev-old-001');
+    InvestigationTaskService.onCollectionArchived('col-all-001', 'ev-old-001');
     const updated = InvestigationTaskRepository.findById(task.id)!;
     expect(updated.status).toBe('in_progress');
+    expect(updated.syncNotes[0].impact).toBe('status_advanced');
+  });
+
+  it('部分采集项归档时不应推进状态且impact为info_only', () => {
+    seedCollectionItem('col-part-001', CASE_ID, '采集项1');
+    seedCollectionItem('col-part-002', CASE_ID, '采集项2');
+
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '部分归档',
+      collectionItemIds: ['col-part-001', 'col-part-002'],
+      createdBy: COL_A_ID,
+    });
+
+    InvestigationTaskService.onCollectionArchived('col-part-001', 'ev-part-001');
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.status).toBe('pending');
+    expect(updated.syncNotes[0].impact).toBe('info_only');
   });
 });
 
 describe('InvestigationTaskService - 同步引擎: 关系线变更', () => {
-  it('关系线变更时应给关联任务添加同步通知', () => {
+  it('关系线标签变更时pending任务应自动推进为in_progress且impact为status_advanced', () => {
     const task = InvestigationTaskService.createTask({
       caseId: CASE_ID,
       title: '关系线同步测试',
@@ -412,16 +432,58 @@ describe('InvestigationTaskService - 同步引擎: 关系线变更', () => {
       createdBy: COL_A_ID,
     });
 
-    const updatedTasks = InvestigationTaskService.onConnectionUpdated('conn-sync-001', '标签: 旧 → 新');
+    const changes: SyncSourceChange[] = [
+      { field: 'label', oldValue: '旧标签', newValue: '新标签' },
+    ];
+    const updatedTasks = InvestigationTaskService.onConnectionUpdated('conn-sync-001', changes);
     expect(updatedTasks).toHaveLength(1);
 
     const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.status).toBe('in_progress');
     expect(updated.syncNotes.length).toBe(1);
     expect(updated.syncNotes[0].sourceType).toBe('connection_updated');
-    expect(updated.syncNotes[0].detail).toContain('标签: 旧 → 新');
+    expect(updated.syncNotes[0].impact).toBe('status_advanced');
+    expect(updated.syncNotes[0].detail).toContain('label');
 
     const logs = getAuditLogsByAction('sync_connection_updated');
     expect(logs).toHaveLength(1);
+  });
+
+  it('关系线线型变更时pending任务impact为info_only不推进状态', () => {
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '线型变更测试',
+      connectionIds: ['conn-style-001'],
+      createdBy: COL_A_ID,
+    });
+
+    const changes: SyncSourceChange[] = [
+      { field: 'lineStyle', oldValue: 'solid', newValue: 'dashed' },
+    ];
+    const updatedTasks = InvestigationTaskService.onConnectionUpdated('conn-style-001', changes);
+    expect(updatedTasks).toHaveLength(1);
+
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.status).toBe('pending');
+    expect(updated.syncNotes[0].impact).toBe('info_only');
+  });
+
+  it('in_progress任务收到关系线标签变更不应再推进', () => {
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '已推进任务',
+      connectionIds: ['conn-adv-001'],
+      createdBy: COL_A_ID,
+    });
+    InvestigationTaskService.updateTask(task.id, { status: 'in_progress' }, COL_A_ID);
+
+    const changes: SyncSourceChange[] = [
+      { field: 'label', oldValue: '旧', newValue: '新' },
+    ];
+    InvestigationTaskService.onConnectionUpdated('conn-adv-001', changes);
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.status).toBe('in_progress');
+    expect(updated.syncNotes[0].impact).toBe('info_only');
   });
 
   it('无关联关系线的任务不应收到通知', () => {
@@ -431,13 +493,16 @@ describe('InvestigationTaskService - 同步引擎: 关系线变更', () => {
       createdBy: COL_A_ID,
     });
 
-    const updatedTasks = InvestigationTaskService.onConnectionUpdated('conn-sync-002', '变更');
+    const changes: SyncSourceChange[] = [
+      { field: 'label', oldValue: '旧', newValue: '新' },
+    ];
+    const updatedTasks = InvestigationTaskService.onConnectionUpdated('conn-sync-002', changes);
     expect(updatedTasks).toHaveLength(0);
   });
 });
 
 describe('InvestigationTaskService - 同步引擎: 证据变更', () => {
-  it('证据变更时应给关联任务添加同步通知', () => {
+  it('证据内容变更时给关联任务添加info_only通知', () => {
     seedEvidence('ev-sync-002', CASE_ID, '变更证据');
 
     const task = InvestigationTaskService.createTask({
@@ -447,15 +512,105 @@ describe('InvestigationTaskService - 同步引擎: 证据变更', () => {
       createdBy: COL_A_ID,
     });
 
-    const updatedTasks = InvestigationTaskService.onEvidenceUpdated('ev-sync-002', '内容变更');
+    const changes: SyncSourceChange[] = [
+      { field: 'content', oldValue: '变更证据', newValue: '更新后证据' },
+    ];
+    const updatedTasks = InvestigationTaskService.onEvidenceUpdated('ev-sync-002', changes);
     expect(updatedTasks).toHaveLength(1);
 
     const updated = InvestigationTaskRepository.findById(task.id)!;
     expect(updated.syncNotes.length).toBe(1);
     expect(updated.syncNotes[0].sourceType).toBe('evidence_updated');
+    expect(updated.syncNotes[0].impact).toBe('info_only');
 
     const logs = getAuditLogsByAction('sync_evidence_updated');
     expect(logs).toHaveLength(1);
+  });
+
+  it('证据重要性提升为critical时pending任务应推进为in_progress', () => {
+    seedEvidence('ev-imp-001', CASE_ID, '重要证据');
+
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '重要性提升测试',
+      evidenceIds: ['ev-imp-001'],
+      priority: 'normal',
+      createdBy: COL_A_ID,
+    });
+
+    const changes: SyncSourceChange[] = [
+      { field: 'importance', oldValue: 'normal', newValue: 'critical' },
+    ];
+    InvestigationTaskService.onEvidenceUpdated('ev-imp-001', changes);
+
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.status).toBe('in_progress');
+  });
+
+  it('证据重要性提升时应同步升级任务优先级并写审计', () => {
+    seedEvidence('ev-esc-001', CASE_ID, '升级证据');
+
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '优先级升级测试',
+      evidenceIds: ['ev-esc-001'],
+      priority: 'low',
+      createdBy: COL_A_ID,
+    });
+
+    const changes: SyncSourceChange[] = [
+      { field: 'importance', oldValue: 'normal', newValue: 'high' },
+    ];
+    InvestigationTaskService.onEvidenceUpdated('ev-esc-001', changes);
+
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.priority).toBe('high');
+
+    const escalationLogs = getAuditLogsByAction('sync_priority_escalated');
+    expect(escalationLogs).toHaveLength(1);
+    expect(escalationLogs[0].detail).toContain('low');
+    expect(escalationLogs[0].detail).toContain('high');
+  });
+
+  it('证据重要性降低时不应降级任务优先级', () => {
+    seedEvidence('ev-down-001', CASE_ID, '降级证据');
+
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '不可降级测试',
+      evidenceIds: ['ev-down-001'],
+      priority: 'critical',
+      createdBy: COL_A_ID,
+    });
+
+    const changes: SyncSourceChange[] = [
+      { field: 'importance', oldValue: 'critical', newValue: 'low' },
+    ];
+    InvestigationTaskService.onEvidenceUpdated('ev-down-001', changes);
+
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.priority).toBe('critical');
+  });
+
+  it('证据状态变更时pending任务应推进为in_progress', () => {
+    seedEvidence('ev-status-001', CASE_ID, '状态变更证据');
+
+    const task = InvestigationTaskService.createTask({
+      caseId: CASE_ID,
+      title: '状态推进测试',
+      evidenceIds: ['ev-status-001'],
+      createdBy: COL_A_ID,
+    });
+
+    const changes: SyncSourceChange[] = [
+      { field: 'status', oldValue: 'pending', newValue: 'in_progress' },
+    ];
+    InvestigationTaskService.onEvidenceUpdated('ev-status-001', changes);
+
+    const updated = InvestigationTaskRepository.findById(task.id)!;
+    expect(updated.status).toBe('in_progress');
+    const statusNote = updated.syncNotes.find((n) => n.impact === 'status_advanced');
+    expect(statusNote).toBeDefined();
   });
 });
 

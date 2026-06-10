@@ -32,7 +32,20 @@ import type {
   InvestigationTaskSyncNote,
   InvestigationTaskStatus,
   InvestigationTaskPriority,
+  SyncNoteImpact,
 } from '@/types';
+
+const IMPACT_LABELS: Record<SyncNoteImpact, string> = {
+  status_advanced: '状态推进',
+  priority_escalated: '优先级升级',
+  info_only: '信息通知',
+};
+
+const IMPACT_COLORS: Record<SyncNoteImpact, string> = {
+  status_advanced: CYBERPUNK_COLORS.accentRed,
+  priority_escalated: CYBERPUNK_COLORS.accentYellow,
+  info_only: CYBERPUNK_COLORS.accentCyan,
+};
 
 const STATUS_LABELS: Record<InvestigationTaskStatus, string> = {
   pending: '待处理',
@@ -73,6 +86,10 @@ const SYNC_NOTE_COLORS: Record<InvestigationTaskSyncNote['sourceType'], string> 
   evidence_updated: CYBERPUNK_COLORS.accentYellow,
   connection_updated: CYBERPUNK_COLORS.accentCyan,
 };
+
+function getUrgentNoteCount(notes: InvestigationTaskSyncNote[]): number {
+  return notes.filter((n) => n.impact === 'status_advanced' || n.impact === 'priority_escalated').length;
+}
 
 const FILTER_OPTIONS: Array<{ value: 'all' | InvestigationTaskStatus; label: string }> = [
   { value: 'all', label: '全部' },
@@ -144,6 +161,10 @@ export const InvestigationTaskPanel: React.FC = () => {
 
   const totalSyncNotes = useMemo(() => {
     return tasks.reduce((sum, t) => sum + (t.syncNotes?.length ?? 0), 0);
+  }, [tasks]);
+
+  const totalUrgentNotes = useMemo(() => {
+    return tasks.reduce((sum, t) => sum + getUrgentNoteCount(t.syncNotes ?? []), 0);
   }, [tasks]);
 
   const getCollectionLabel = (collectionItemId: string) => {
@@ -322,7 +343,21 @@ export const InvestigationTaskPanel: React.FC = () => {
           </span>
         </div>
       )}
-      {totalSyncNotes > 0 && (
+      {totalUrgentNotes > 0 && (
+        <div
+          className="rounded-sm border p-2 mb-2 flex items-center gap-2"
+          style={{
+            borderColor: getGlowColor(CYBERPUNK_COLORS.accentRed, 0.4),
+            backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentRed, 0.08),
+          }}
+        >
+          <AlertTriangle size={14} style={{ color: CYBERPUNK_COLORS.accentRed }} />
+          <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.accentRed }}>
+            {totalUrgentNotes} 条催办通知（状态推进/优先级升级）
+          </span>
+        </div>
+      )}
+      {totalSyncNotes > totalUrgentNotes && (
         <div
           className="rounded-sm border p-2 mb-2 flex items-center gap-2"
           style={{
@@ -332,7 +367,7 @@ export const InvestigationTaskPanel: React.FC = () => {
         >
           <Bell size={14} style={{ color: CYBERPUNK_COLORS.accentCyan }} />
           <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.accentCyan }}>
-            {totalSyncNotes} 条来源同步通知
+            {totalSyncNotes - totalUrgentNotes} 条来源同步通知
           </span>
         </div>
       )}
@@ -363,6 +398,7 @@ export const InvestigationTaskPanel: React.FC = () => {
         const overdue = isOverdue(task);
         const daysLeft = getDaysRemaining(task.deadline);
         const syncCount = task.syncNotes?.length ?? 0;
+        const urgentCount = getUrgentNoteCount(task.syncNotes ?? []);
 
         return (
           <div
@@ -410,7 +446,19 @@ export const InvestigationTaskPanel: React.FC = () => {
                   >
                     {STATUS_LABELS[task.status]}
                   </span>
-                  {syncCount > 0 && (
+                  {urgentCount > 0 && (
+                    <span
+                      className="text-xs font-mono px-1.5 py-0.5 rounded-sm"
+                      style={{
+                        backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentRed, 0.15),
+                        color: CYBERPUNK_COLORS.accentRed,
+                        border: `1px solid ${getGlowColor(CYBERPUNK_COLORS.accentRed, 0.3)}`,
+                      }}
+                    >
+                      <AlertTriangle size={8} className="inline" /> {urgentCount}
+                    </span>
+                  )}
+                  {syncCount > urgentCount && (
                     <span
                       className="text-xs font-mono px-1.5 py-0.5 rounded-sm"
                       style={{
@@ -419,7 +467,7 @@ export const InvestigationTaskPanel: React.FC = () => {
                         border: `1px solid ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.3)}`,
                       }}
                     >
-                      <Bell size={8} className="inline" /> {syncCount}
+                      <Bell size={8} className="inline" /> {syncCount - urgentCount}
                     </span>
                   )}
                   <span
@@ -649,19 +697,26 @@ export const InvestigationTaskPanel: React.FC = () => {
   const renderSyncNotes = (task: InvestigationTask) => {
     const notes = task.syncNotes ?? [];
     if (notes.length === 0) return null;
+    const urgentCount = getUrgentNoteCount(notes);
 
     return (
       <div
         className="rounded-sm border p-2.5 space-y-2"
         style={{
-          borderColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.4),
-          backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.04),
+          borderColor: urgentCount > 0
+            ? getGlowColor(CYBERPUNK_COLORS.accentRed, 0.4)
+            : getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.4),
+          backgroundColor: urgentCount > 0
+            ? getGlowColor(CYBERPUNK_COLORS.accentRed, 0.04)
+            : getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.04),
         }}
       >
         <div className="flex items-center justify-between">
-          <div className="text-xs font-mono font-bold flex items-center gap-1" style={{ color: CYBERPUNK_COLORS.accentCyan }}>
-            <Bell size={12} />
-            同步通知 ({notes.length})
+          <div className="text-xs font-mono font-bold flex items-center gap-1" style={{
+            color: urgentCount > 0 ? CYBERPUNK_COLORS.accentRed : CYBERPUNK_COLORS.accentCyan,
+          }}>
+            {urgentCount > 0 ? <AlertTriangle size={12} /> : <Bell size={12} />}
+            {urgentCount > 0 ? `催办通知 (${urgentCount})` : `同步通知 (${notes.length})`}
           </div>
           <div className="flex gap-1">
             <button
@@ -688,24 +743,41 @@ export const InvestigationTaskPanel: React.FC = () => {
         </div>
         {showSyncNotes && (
           <div className="space-y-1 max-h-40 overflow-y-auto">
-            {notes.map((note) => (
-              <div
-                key={note.id}
-                className="flex items-start gap-1.5 text-xs font-mono px-2 py-1.5 rounded-sm"
-                style={{
-                  backgroundColor: getGlowColor(SYNC_NOTE_COLORS[note.sourceType], 0.08),
-                  border: `1px solid ${getGlowColor(SYNC_NOTE_COLORS[note.sourceType], 0.2)}`,
-                }}
-              >
-                <span className="flex-shrink-0">{SYNC_NOTE_ICONS[note.sourceType]}</span>
-                <div className="flex-1">
-                  <div style={{ color: SYNC_NOTE_COLORS[note.sourceType] }}>{note.detail}</div>
-                  <div className="mt-0.5" style={{ color: CYBERPUNK_COLORS.textSecondary, fontSize: '9px' }}>
-                    {new Date(note.timestamp).toLocaleString('zh-CN')}
+            {notes.map((note) => {
+              const impactColor = IMPACT_COLORS[note.impact ?? 'info_only'];
+              const sourceColor = SYNC_NOTE_COLORS[note.sourceType];
+              return (
+                <div
+                  key={note.id}
+                  className="flex items-start gap-1.5 text-xs font-mono px-2 py-1.5 rounded-sm"
+                  style={{
+                    backgroundColor: getGlowColor(sourceColor, 0.08),
+                    border: `1px solid ${getGlowColor(note.impact === 'status_advanced' || note.impact === 'priority_escalated' ? impactColor : sourceColor, 0.2)}`,
+                  }}
+                >
+                  <span className="flex-shrink-0">{SYNC_NOTE_ICONS[note.sourceType]}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-1">
+                      <span
+                        className="text-xs font-mono px-1 py-0 rounded-sm"
+                        style={{
+                          color: impactColor,
+                          backgroundColor: getGlowColor(impactColor, 0.12),
+                          border: `1px solid ${getGlowColor(impactColor, 0.25)}`,
+                          fontSize: '9px',
+                        }}
+                      >
+                        {IMPACT_LABELS[note.impact ?? 'info_only']}
+                      </span>
+                    </div>
+                    <div className="mt-0.5" style={{ color: sourceColor }}>{note.detail}</div>
+                    <div className="mt-0.5" style={{ color: CYBERPUNK_COLORS.textSecondary, fontSize: '9px' }}>
+                      {new Date(note.timestamp).toLocaleString('zh-CN')}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -721,6 +793,7 @@ export const InvestigationTaskPanel: React.FC = () => {
     const daysLeft = getDaysRemaining(task.deadline);
     const isActive = task.status !== 'completed' && task.status !== 'cancelled';
     const syncCount = task.syncNotes?.length ?? 0;
+    const urgentCount = getUrgentNoteCount(task.syncNotes ?? []);
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -759,7 +832,20 @@ export const InvestigationTaskPanel: React.FC = () => {
                 {task.title}
               </span>
             )}
-            {syncCount > 0 && (
+            {urgentCount > 0 && (
+              <span
+                className="text-xs font-mono px-1.5 py-0.5 rounded-sm cursor-pointer"
+                style={{
+                  backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentRed, 0.15),
+                  color: CYBERPUNK_COLORS.accentRed,
+                  border: `1px solid ${getGlowColor(CYBERPUNK_COLORS.accentRed, 0.3)}`,
+                }}
+                onClick={() => setShowSyncNotes(!showSyncNotes)}
+              >
+                <AlertTriangle size={8} className="inline" /> {urgentCount} 催办
+              </span>
+            )}
+            {syncCount > urgentCount && (
               <span
                 className="text-xs font-mono px-1.5 py-0.5 rounded-sm cursor-pointer"
                 style={{
@@ -769,7 +855,7 @@ export const InvestigationTaskPanel: React.FC = () => {
                 }}
                 onClick={() => setShowSyncNotes(!showSyncNotes)}
               >
-                <Bell size={8} className="inline" /> {syncCount}
+                <Bell size={8} className="inline" /> {syncCount - urgentCount}
               </span>
             )}
           </div>

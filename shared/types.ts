@@ -209,7 +209,8 @@ export type AuditAction =
   | 'link_connection_to_task'
   | 'sync_collection_archived'
   | 'sync_evidence_updated'
-  | 'sync_connection_updated';
+  | 'sync_connection_updated'
+  | 'sync_priority_escalated';
 
 export interface AuditLog {
   id: string;
@@ -380,12 +381,21 @@ export interface TraceGraph {
 export type InvestigationTaskPriority = 'low' | 'normal' | 'high' | 'critical';
 export type InvestigationTaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
+export type SyncNoteImpact = 'status_advanced' | 'priority_escalated' | 'info_only';
+
 export interface InvestigationTaskSyncNote {
   id: string;
   sourceType: 'collection_archived' | 'evidence_updated' | 'connection_updated';
   sourceId: string;
   detail: string;
+  impact: SyncNoteImpact;
   timestamp: string;
+}
+
+export interface SyncSourceChange {
+  field: string;
+  oldValue: string;
+  newValue: string;
 }
 
 export interface InvestigationTask {

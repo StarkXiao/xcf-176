@@ -1,5 +1,6 @@
 import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
+import { InvestigationTaskService } from './InvestigationTaskService.js';
 export const EvidenceService = {
     getAllEvidence: () => {
         return EvidenceRepository.findAll();
@@ -39,7 +40,24 @@ export const EvidenceService = {
         return EvidenceRepository.create(dto);
     },
     updateEvidence: (id, dto) => {
-        return EvidenceRepository.update(id, dto);
+        const existing = EvidenceRepository.findById(id);
+        const updated = EvidenceRepository.update(id, dto);
+        if (updated && existing) {
+            const changes = [];
+            if (dto.content !== undefined && dto.content !== existing.content) {
+                changes.push(`内容变更`);
+            }
+            if (dto.importance !== undefined && dto.importance !== existing.importance) {
+                changes.push(`重要性: ${existing.importance} → ${dto.importance}`);
+            }
+            if (dto.status !== undefined && dto.status !== existing.status) {
+                changes.push(`状态: ${existing.status} → ${dto.status}`);
+            }
+            if (changes.length > 0) {
+                InvestigationTaskService.onEvidenceUpdated(id, changes.join(', '));
+            }
+        }
+        return updated;
     },
     deleteEvidence: (id) => {
         ConnectionRepository.deleteByEvidenceId(id);

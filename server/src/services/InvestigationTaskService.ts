@@ -5,12 +5,38 @@ import { EvidenceCollectionRepository } from '../repositories/EvidenceCollection
 import { v4 as uuidv4 } from 'uuid';
 import type {
   InvestigationTask,
+  InvestigationTaskPriority,
   InvestigationTaskStatus,
   InvestigationTaskSyncNote,
+  SyncNoteImpact,
+  SyncSourceChange,
   CreateInvestigationTaskDto,
   UpdateInvestigationTaskDto,
   CreateAuditLogDto,
 } from '@shared/types';
+
+const PRIORITY_LEVELS: Record<InvestigationTaskPriority, number> = {
+  low: 0,
+  normal: 1,
+  high: 2,
+  critical: 3,
+};
+
+function resolvePriorityLevel(p: InvestigationTaskPriority): number {
+  return PRIORITY_LEVELS[p] ?? 1;
+}
+
+function shouldEscalatePriority(current: InvestigationTaskPriority, target: InvestigationTaskPriority): boolean {
+  return resolvePriorityLevel(target) > resolvePriorityLevel(current);
+}
+
+function allCollectionItemsArchived(task: InvestigationTask): boolean {
+  if (task.collectionItemIds.length === 0) return false;
+  return task.collectionItemIds.every((cid) => {
+    const item = EvidenceCollectionRepository.findById(cid);
+    return item && item.archivedAt;
+  });
+}
 
 function recordAuditLog(caseId: string, action: string, targetType: string, targetId: string, detail: string, collaboratorId: string): void {
   const collaborator = CollaboratorRepository.findById(collaboratorId);
@@ -30,6 +56,118 @@ function resolveAssigneeName(assigneeId: string | null | undefined): string | nu
   if (!assigneeId) return null;
   const collaborator = CollaboratorRepository.findById(assigneeId);
   return collaborator?.name ?? null;
+}
+
+function makeSyncNote(
+  sourceType: InvestigationTaskSyncNote['sourceType'],
+  sourceId: string,
+  detail: string,
+  impact: SyncNoteImpact,
+): InvestigationTaskSyncNote {
+  return {
+    id: uuidv4(),
+    sourceType,
+    sourceId,
+    detail,
+    impact,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+type SyncAuditAction = 'sync_collection_archived' | 'sync_evidence_updated' | 'sync_connection_updated' | 'sync_priority_escalated';
+
+interface SyncResult {
+  patch: UpdateInvestigationTaskDto;
+  notes: InvestigationTaskSyncNote[];
+  auditEntries: Array<{ action: SyncAuditAction; detail: string }>;
+}
+
+function computeSyncPatch(
+  task: InvestigationTask,
+  sourceType: InvestigationTaskSyncNote['sourceType'],
+  sourceId: string,
+  detail: string,
+  changes: SyncSourceChange[],
+  extraPatch?: UpdateInvestigationTaskDto,
+): SyncResult {
+  const notes: InvestigationTaskSyncNote[] = [];
+  const auditEntries: Array<{ action: SyncAuditAction; detail: string }> = [];
+  const patch: UpdateInvestigationTaskDto = { ...extraPatch };
+
+  let impact: SyncNoteImpact = 'info_only';
+  const statusAdvanced = task.status === 'pending';
+
+  if (statusAdvanced) {
+    if (sourceType === 'collection_archived') {
+      if (allCollectionItemsArchived(task)) {
+        impact = 'status_advanced';
+        patch.status = 'in_progress';
+      }
+    } else if (sourceType === 'evidence_updated') {
+      const importanceChange = changes.find((c) => c.field === 'importance');
+      const statusChange = changes.find((c) => c.field === 'status');
+      if (importanceChange?.newValue === 'critical' || statusChange) {
+        impact = 'status_advanced';
+        patch.status = 'in_progress';
+      }
+    } else if (sourceType === 'connection_updated') {
+      const labelChange = changes.find((c) => c.field === 'label');
+      if (labelChange) {
+        impact = 'status_advanced';
+        patch.status = 'in_progress';
+      }
+    }
+  }
+
+  if (sourceType === 'evidence_updated') {
+    const importanceChange = changes.find((c) => c.field === 'importance');
+    if (importanceChange) {
+      const newLevel = importanceChange.newValue as InvestigationTaskPriority;
+      if (shouldEscalatePriority(task.priority, newLevel)) {
+        if (impact === 'info_only') impact = 'priority_escalated';
+        patch.priority = newLevel;
+        notes.push(makeSyncNote(sourceType, sourceId, `关联证据重要性提升: ${task.priority} → ${newLevel}`, 'priority_escalated'));
+        auditEntries.push({
+          action: 'sync_priority_escalated',
+          detail: `任务优先级升级: ${task.priority} → ${newLevel} (证据重要性变更)`,
+        });
+      }
+    }
+  }
+
+  if (sourceType === 'collection_archived') {
+    const collectionItem = EvidenceCollectionRepository.findById(sourceId);
+    const archiveNote = makeSyncNote(
+      sourceType,
+      sourceId,
+      `采集项「${collectionItem?.content.slice(0, 30) ?? sourceId}」已归档为证据卡片`,
+      impact,
+    );
+    notes.push(archiveNote);
+  } else {
+    notes.push(makeSyncNote(sourceType, sourceId, detail, impact));
+  }
+
+  if (impact === 'status_advanced' && patch.status) {
+    auditEntries.push({
+      action: sourceType === 'collection_archived' ? 'sync_collection_archived'
+        : sourceType === 'evidence_updated' ? 'sync_evidence_updated'
+        : 'sync_connection_updated',
+      detail: `任务状态自动推进: ${task.status} → ${patch.status} (${detail})`,
+    });
+  }
+
+  if (impact === 'info_only') {
+    auditEntries.push({
+      action: sourceType === 'collection_archived' ? 'sync_collection_archived'
+        : sourceType === 'evidence_updated' ? 'sync_evidence_updated'
+        : 'sync_connection_updated',
+      detail,
+    });
+  }
+
+  patch.syncNotes = [...task.syncNotes, ...notes];
+  return { patch, notes, auditEntries };
 }
 
 export const InvestigationTaskService = {
@@ -188,38 +326,25 @@ export const InvestigationTaskService = {
     for (const task of affectedTasks) {
       if (task.status === 'completed' || task.status === 'cancelled') continue;
 
-      const patch: UpdateInvestigationTaskDto = {};
-      const newEvidenceIds = task.evidenceIds.includes(evidenceId)
-        ? task.evidenceIds
-        : [...task.evidenceIds, evidenceId];
-      if (newEvidenceIds.length !== task.evidenceIds.length) {
-        patch.evidenceIds = newEvidenceIds;
+      const evidencePatch: UpdateInvestigationTaskDto = {};
+      if (!task.evidenceIds.includes(evidenceId)) {
+        evidencePatch.evidenceIds = [...task.evidenceIds, evidenceId];
       }
 
-      const collectionItem = EvidenceCollectionRepository.findById(collectionItemId);
-      const note: InvestigationTaskSyncNote = {
-        id: uuidv4(),
-        sourceType: 'collection_archived',
-        sourceId: collectionItemId,
-        detail: `采集项「${collectionItem?.content.slice(0, 30) ?? collectionItemId}」已归档为证据卡片`,
-        timestamp: new Date().toISOString(),
-      };
-      patch.syncNotes = [...task.syncNotes, note];
-
-      const allLinkedCollected = InvestigationTaskRepository.findById(task.id);
-      if (allLinkedCollected) {
-        const allArchived = allLinkedCollected.collectionItemIds.every((cid) => {
-          const item = EvidenceCollectionRepository.findById(cid);
-          return item && item.archivedAt;
-        });
-        if (allArchived && allLinkedCollected.collectionItemIds.length > 0 && task.status === 'pending') {
-          patch.status = 'in_progress';
-        }
-      }
+      const { patch, auditEntries } = computeSyncPatch(
+        task,
+        'collection_archived',
+        collectionItemId,
+        '采集项归档',
+        [],
+        evidencePatch,
+      );
 
       const updated = InvestigationTaskRepository.update(task.id, patch);
       if (updated) {
-        recordAuditLog(task.caseId, 'sync_collection_archived', 'case', task.id, note.detail, 'system');
+        for (const entry of auditEntries) {
+          recordAuditLog(task.caseId, entry.action, 'case', task.id, entry.detail, 'system');
+        }
         updatedTasks.push(updated);
       }
     }
@@ -227,26 +352,27 @@ export const InvestigationTaskService = {
     return updatedTasks;
   },
 
-  onConnectionUpdated: (connectionId: string, changeDetail: string): InvestigationTask[] => {
+  onConnectionUpdated: (connectionId: string, changes: SyncSourceChange[]): InvestigationTask[] => {
     const affectedTasks = InvestigationTaskRepository.findByConnectionId(connectionId);
     const updatedTasks: InvestigationTask[] = [];
+    const changeDetail = changes.map((c) => `${c.field}: ${c.oldValue} → ${c.newValue}`).join(', ');
 
     for (const task of affectedTasks) {
       if (task.status === 'completed' || task.status === 'cancelled') continue;
 
-      const note: InvestigationTaskSyncNote = {
-        id: uuidv4(),
-        sourceType: 'connection_updated',
-        sourceId: connectionId,
-        detail: `关联关系线变更: ${changeDetail}`,
-        timestamp: new Date().toISOString(),
-      };
+      const { patch, auditEntries } = computeSyncPatch(
+        task,
+        'connection_updated',
+        connectionId,
+        `关联关系线变更: ${changeDetail}`,
+        changes,
+      );
 
-      const updated = InvestigationTaskRepository.update(task.id, {
-        syncNotes: [...task.syncNotes, note],
-      });
+      const updated = InvestigationTaskRepository.update(task.id, patch);
       if (updated) {
-        recordAuditLog(task.caseId, 'sync_connection_updated', 'case', task.id, note.detail, 'system');
+        for (const entry of auditEntries) {
+          recordAuditLog(task.caseId, entry.action, 'case', task.id, entry.detail, 'system');
+        }
         updatedTasks.push(updated);
       }
     }
@@ -254,26 +380,27 @@ export const InvestigationTaskService = {
     return updatedTasks;
   },
 
-  onEvidenceUpdated: (evidenceId: string, changeDetail: string): InvestigationTask[] => {
+  onEvidenceUpdated: (evidenceId: string, changes: SyncSourceChange[]): InvestigationTask[] => {
     const affectedTasks = InvestigationTaskRepository.findByEvidenceId(evidenceId);
     const updatedTasks: InvestigationTask[] = [];
+    const changeDetail = changes.map((c) => `${c.field}: ${c.oldValue} → ${c.newValue}`).join(', ');
 
     for (const task of affectedTasks) {
       if (task.status === 'completed' || task.status === 'cancelled') continue;
 
-      const note: InvestigationTaskSyncNote = {
-        id: uuidv4(),
-        sourceType: 'evidence_updated',
-        sourceId: evidenceId,
-        detail: `关联证据变更: ${changeDetail}`,
-        timestamp: new Date().toISOString(),
-      };
+      const { patch, auditEntries } = computeSyncPatch(
+        task,
+        'evidence_updated',
+        evidenceId,
+        `关联证据变更: ${changeDetail}`,
+        changes,
+      );
 
-      const updated = InvestigationTaskRepository.update(task.id, {
-        syncNotes: [...task.syncNotes, note],
-      });
+      const updated = InvestigationTaskRepository.update(task.id, patch);
       if (updated) {
-        recordAuditLog(task.caseId, 'sync_evidence_updated', 'case', task.id, note.detail, 'system');
+        for (const entry of auditEntries) {
+          recordAuditLog(task.caseId, entry.action, 'case', task.id, entry.detail, 'system');
+        }
         updatedTasks.push(updated);
       }
     }

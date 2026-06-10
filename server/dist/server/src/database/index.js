@@ -159,6 +159,28 @@ const createTables = () => {
       FOREIGN KEY (discussion_id) REFERENCES consultation_discussions(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS investigation_tasks (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      priority TEXT NOT NULL DEFAULT 'normal',
+      status TEXT NOT NULL DEFAULT 'pending',
+      assignee_id TEXT,
+      assignee_name TEXT DEFAULT NULL,
+      deadline TEXT,
+      evidence_ids TEXT DEFAULT '[]',
+      collection_item_ids TEXT DEFAULT '[]',
+      connection_ids TEXT DEFAULT '[]',
+      sync_notes TEXT DEFAULT '[]',
+      created_by TEXT NOT NULL,
+      created_by_name TEXT NOT NULL DEFAULT '',
+      completed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_evidence_case_id ON evidence(case_id);
     CREATE INDEX IF NOT EXISTS idx_connections_case_id ON connections(case_id);
     CREATE INDEX IF NOT EXISTS idx_connections_from ON connections(from_evidence_id);
@@ -175,6 +197,10 @@ const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_consultation_discussions_consultation_id ON consultation_discussions(consultation_id);
     CREATE INDEX IF NOT EXISTS idx_consultation_conclusions_consultation_id ON consultation_conclusions(consultation_id);
     CREATE INDEX IF NOT EXISTS idx_consultation_disputes_consultation_id ON consultation_disputes(consultation_id);
+    CREATE INDEX IF NOT EXISTS idx_investigation_tasks_case_id ON investigation_tasks(case_id);
+    CREATE INDEX IF NOT EXISTS idx_investigation_tasks_status ON investigation_tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_investigation_tasks_assignee_id ON investigation_tasks(assignee_id);
+    CREATE INDEX IF NOT EXISTS idx_investigation_tasks_deadline ON investigation_tasks(deadline);
   `);
 };
 const runMigrations = () => {
@@ -579,6 +605,110 @@ const seedData = () => {
     ];
     for (const d of disputes) {
         insertDispute.run(d.id, d.consultationId, d.discussionId, d.evidenceId, d.description, d.raisedBy, d.raisedByName, d.resolution, d.resolvedBy, d.resolvedByName, d.resolvedAt, d.createdAt);
+    }
+    const insertTask = db.prepare(`
+    INSERT INTO investigation_tasks (
+      id, case_id, title, description, priority, status,
+      assignee_id, assignee_name, deadline,
+      evidence_ids, collection_item_ids, connection_ids,
+      created_by, created_by_name, completed_at,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+    const tasks = [
+        {
+            id: 'task-001',
+            title: '追踪500万资金流向',
+            description: '对李某500万转账记录进行深入追踪，联系反洗钱中心获取详细资金链路，重点关注地下钱庄中转和虚拟货币出境路径',
+            priority: 'critical',
+            status: 'in_progress',
+            assigneeId: 'col-002',
+            assigneeName: '李分析员',
+            deadline: '2024-07-15T23:59:59Z',
+            evidenceIds: ['ev-004', 'ev-009'],
+            collectionItemIds: [],
+            connectionIds: ['conn-007'],
+            createdBy: 'col-001',
+            createdByName: '张队长',
+            completedAt: null,
+            createdAt: '2024-06-29T10:30:00Z',
+            updatedAt: '2024-07-01T10:00:00Z',
+        },
+        {
+            id: 'task-002',
+            title: '确认"王总"真实身份',
+            description: '综合微信聊天记录、通话录音和IP分析报告，通过交叉比对确认"王总"的真实身份及与张婷的关系',
+            priority: 'critical',
+            status: 'pending',
+            assigneeId: 'col-001',
+            assigneeName: '张队长',
+            deadline: '2024-07-10T23:59:59Z',
+            evidenceIds: ['ev-001', 'ev-006', 'ev-008'],
+            collectionItemIds: [],
+            connectionIds: ['conn-001', 'conn-005', 'conn-006'],
+            createdBy: 'col-002',
+            createdByName: '李分析员',
+            completedAt: null,
+            createdAt: '2024-07-02T14:30:00Z',
+            updatedAt: '2024-07-02T14:30:00Z',
+        },
+        {
+            id: 'task-003',
+            title: '调取张婷（DP00128）背景信息',
+            description: '通过"鼎盛财富"平台工号DP00128追踪张婷的真实身份，调取其注册信息、银行账户及社交关系',
+            priority: 'high',
+            status: 'in_progress',
+            assigneeId: 'col-003',
+            assigneeName: '王操作员',
+            deadline: '2024-07-08T23:59:59Z',
+            evidenceIds: ['ev-002'],
+            collectionItemIds: [],
+            connectionIds: ['conn-002'],
+            createdBy: 'col-001',
+            createdByName: '张队长',
+            completedAt: null,
+            createdAt: '2024-07-02T15:00:00Z',
+            updatedAt: '2024-07-02T15:00:00Z',
+        },
+        {
+            id: 'task-004',
+            title: '核实缅甸果敢服务器关联',
+            description: '进一步核实IP定位报告中果敢服务器的运营信息，联系缅甸警方获取协查反馈',
+            priority: 'high',
+            status: 'completed',
+            assigneeId: 'col-002',
+            assigneeName: '李分析员',
+            deadline: '2024-07-05T23:59:59Z',
+            evidenceIds: ['ev-007'],
+            collectionItemIds: [],
+            connectionIds: ['conn-008', 'conn-009'],
+            createdBy: 'col-001',
+            createdByName: '张队长',
+            completedAt: '2024-07-04T16:00:00Z',
+            createdAt: '2024-06-29T10:00:00Z',
+            updatedAt: '2024-07-04T16:00:00Z',
+        },
+        {
+            id: 'task-005',
+            title: '补充保证金诈骗证据链',
+            description: '收集账户冻结通知、保证金缴纳记录等补充证据，完善保证金诈骗环节的证据链条',
+            priority: 'normal',
+            status: 'pending',
+            assigneeId: null,
+            assigneeName: null,
+            deadline: '2024-07-20T23:59:59Z',
+            evidenceIds: ['ev-005', 'ev-006'],
+            collectionItemIds: [],
+            connectionIds: ['conn-004', 'conn-005'],
+            createdBy: 'col-003',
+            createdByName: '王操作员',
+            completedAt: null,
+            createdAt: '2024-07-02T16:00:00Z',
+            updatedAt: '2024-07-02T16:00:00Z',
+        },
+    ];
+    for (const t of tasks) {
+        insertTask.run(t.id, caseId, t.title, t.description, t.priority, t.status, t.assigneeId, t.assigneeName, t.deadline, JSON.stringify(t.evidenceIds), JSON.stringify(t.collectionItemIds), JSON.stringify(t.connectionIds), t.createdBy, t.createdByName, t.completedAt, t.createdAt, t.updatedAt);
     }
 };
 createTables();

@@ -1,4 +1,5 @@
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
+import { InvestigationTaskService } from './InvestigationTaskService.js';
 export const ConnectionService = {
     getAllConnections: () => {
         return ConnectionRepository.findAll();
@@ -16,7 +17,21 @@ export const ConnectionService = {
         return ConnectionRepository.create(dto);
     },
     updateConnection: (id, dto) => {
-        return ConnectionRepository.update(id, dto);
+        const existing = ConnectionRepository.findById(id);
+        const updated = ConnectionRepository.update(id, dto);
+        if (updated && existing) {
+            const changes = [];
+            if (dto.label !== undefined && dto.label !== existing.label) {
+                changes.push(`标签: ${existing.label} → ${dto.label}`);
+            }
+            if (dto.lineStyle !== undefined && dto.lineStyle !== existing.lineStyle) {
+                changes.push(`线型: ${existing.lineStyle} → ${dto.lineStyle}`);
+            }
+            if (changes.length > 0) {
+                InvestigationTaskService.onConnectionUpdated(id, changes.join(', '));
+            }
+        }
+        return updated;
     },
     deleteConnection: (id) => {
         return ConnectionRepository.delete(id);

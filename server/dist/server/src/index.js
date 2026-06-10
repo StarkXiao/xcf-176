@@ -8,6 +8,7 @@ import { auditLogRoutes } from './routes/auditLogRoutes.js';
 import { evidenceCollectionRoutes } from './routes/evidenceCollectionRoutes.js';
 import { consultationRoutes } from './routes/consultationRoutes.js';
 import { traceAnalysisRoutes } from './routes/traceAnalysisRoutes.js';
+import { investigationTaskRoutes } from './routes/investigationTaskRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { PersistenceService } from './services/PersistenceService.js';
 const server = fastify({
@@ -25,6 +26,7 @@ server.register(auditLogRoutes, { prefix: '/api/audit-logs' });
 server.register(evidenceCollectionRoutes, { prefix: '/api/evidence-collection' });
 server.register(consultationRoutes, { prefix: '/api/consultations' });
 server.register(traceAnalysisRoutes, { prefix: '/api/trace-analysis' });
+server.register(investigationTaskRoutes, { prefix: '/api/investigation-tasks' });
 const start = async () => {
     try {
         await server.listen({ host: '0.0.0.0', port: 3001 });
