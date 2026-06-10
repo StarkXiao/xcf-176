@@ -631,6 +631,75 @@ export interface ApplyTemplateResult {
   createdTasks: InvestigationTask[];
 }
 
+export type AnomalyAlertType = 'high_importance' | 'dense_connections' | 'temporal_burst' | 'combined';
+export type AnomalyAlertSeverity = 'warning' | 'high' | 'critical';
+export type AnomalyAlertStatus = 'pending' | 'reviewed' | 'dismissed' | 'resolved';
+
+export interface AnomalyAlert {
+  id: string;
+  caseId: string;
+  caseName: string;
+  type: AnomalyAlertType;
+  severity: AnomalyAlertSeverity;
+  status: AnomalyAlertStatus;
+  title: string;
+  description: string;
+  score: number;
+  evidenceCount: number;
+  connectionCount: number;
+  criticalEvidenceCount: number;
+  highEvidenceCount: number;
+  burstStart?: string;
+  burstEnd?: string;
+  evidenceIds: string[];
+  connectionIds: string[];
+  detectedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  notes?: string;
+}
+
+export interface AnomalyDetectionResult {
+  caseId: string;
+  caseName: string;
+  alerts: AnomalyAlert[];
+  overallScore: number;
+  priorityLevel: AnomalyAlertSeverity;
+  summary: string;
+  recommendations: string[];
+}
+
+export interface HighImportanceDetectionConfig {
+  criticalThreshold?: number;
+  highThreshold?: number;
+  minEvidenceCount?: number;
+}
+
+export interface DenseConnectionsDetectionConfig {
+  minConnectionsPerEvidence?: number;
+  minClusterSize?: number;
+  connectionDensityThreshold?: number;
+}
+
+export interface TemporalBurstDetectionConfig {
+  timeWindowHours?: number;
+  minEvidenceInWindow?: number;
+  burstMultiplier?: number;
+}
+
+export interface AnomalyDetectionConfig {
+  highImportance?: HighImportanceDetectionConfig;
+  denseConnections?: DenseConnectionsDetectionConfig;
+  temporalBurst?: TemporalBurstDetectionConfig;
+  combinedAlertThreshold?: number;
+}
+
+export interface UpdateAnomalyAlertDto {
+  status?: AnomalyAlertStatus;
+  notes?: string;
+  reviewedBy?: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;

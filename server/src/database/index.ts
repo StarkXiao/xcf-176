@@ -250,6 +250,37 @@ const createTables = () => {
 
     CREATE INDEX IF NOT EXISTS idx_case_templates_category ON case_templates(category);
     CREATE INDEX IF NOT EXISTS idx_case_templates_built_in ON case_templates(is_built_in);
+
+    CREATE TABLE IF NOT EXISTS anomaly_alerts (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      case_name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      score REAL NOT NULL DEFAULT 0,
+      evidence_count INTEGER NOT NULL DEFAULT 0,
+      connection_count INTEGER NOT NULL DEFAULT 0,
+      critical_evidence_count INTEGER NOT NULL DEFAULT 0,
+      high_evidence_count INTEGER NOT NULL DEFAULT 0,
+      burst_start TEXT,
+      burst_end TEXT,
+      evidence_ids TEXT NOT NULL DEFAULT '[]',
+      connection_ids TEXT NOT NULL DEFAULT '[]',
+      detected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at TEXT,
+      reviewed_by TEXT,
+      notes TEXT,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_case_id ON anomaly_alerts(case_id);
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_severity ON anomaly_alerts(severity);
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_status ON anomaly_alerts(status);
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_type ON anomaly_alerts(type);
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_detected_at ON anomaly_alerts(detected_at);
   `);
 };
 
