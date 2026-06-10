@@ -16,6 +16,7 @@ interface InvestigationTaskState {
   error: string | null;
   filter: TaskFilter;
   setFilter: (filter: TaskFilter) => void;
+  setTasks: (tasks: InvestigationTask[]) => void;
   loadTasks: (caseId: string) => Promise<void>;
   loadTaskById: (id: string) => Promise<void>;
   createTask: (data: CreateInvestigationTaskDto) => Promise<InvestigationTask | null>;
@@ -42,6 +43,8 @@ export const useInvestigationTaskStore = create<InvestigationTaskState>((set, ge
   filter: 'all',
 
   setFilter: (filter: TaskFilter) => set({ filter }),
+
+  setTasks: (tasks: InvestigationTask[]) => set({ tasks }),
 
   loadTasks: async (caseId: string) => {
     set({ loading: true, error: null });

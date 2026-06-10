@@ -9,10 +9,12 @@ import { useDragDrop } from '@/hooks/useDragDrop';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useCaseStore } from '@/store/useCaseStore';
+import { useUiStore } from '@/store/useUiStore';
 import { connectionApi } from '@/api/connectionApi';
 import { generateConnectionId } from '@/utils/idGenerator';
 import { recordAuditLog, captureConnectionSnapshot } from '@/utils/auditHelper';
 import { CYBERPUNK_COLORS } from '@/utils/colorUtils';
+import type { Connection } from '@/types';
 
 export const Canvas: React.FC = () => {
   const {
@@ -46,6 +48,8 @@ export const Canvas: React.FC = () => {
   const addConnection = useCanvasStore((state) => state.addConnection);
   const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
   const currentCase = useCaseStore((state) => state.currentCase);
+  const pendingRelationType = useUiStore((state) => state.pendingRelationType);
+  const setPendingRelationType = useUiStore((state) => state.setPendingRelationType);
 
   const handleCanvasMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -74,14 +78,15 @@ export const Canvas: React.FC = () => {
             const toEvidence = getEvidenceById(toId);
 
             if (fromEvidence && toEvidence) {
+              const lineStyle = (pendingRelationType?.lineStyle || 'solid') as Connection['lineStyle'];
               const newConnection = {
                 id: generateConnectionId(),
                 caseId: currentCase.id,
                 fromEvidenceId: drawingConnection.fromId,
                 toEvidenceId: toId,
-                label: '',
-                color: CYBERPUNK_COLORS.accentCyan,
-                lineStyle: 'solid' as const,
+                label: pendingRelationType?.label || '',
+                color: pendingRelationType?.color || CYBERPUNK_COLORS.accentCyan,
+                lineStyle,
                 createdAt: new Date().toISOString(),
               };
 
@@ -89,12 +94,16 @@ export const Canvas: React.FC = () => {
                 caseId: currentCase.id,
                 fromEvidenceId: drawingConnection.fromId,
                 toEvidenceId: toId,
-                label: '',
-                color: CYBERPUNK_COLORS.accentCyan,
-                lineStyle: 'solid',
+                label: pendingRelationType?.label || '',
+                color: pendingRelationType?.color || CYBERPUNK_COLORS.accentCyan,
+                lineStyle: pendingRelationType?.lineStyle || 'solid',
               });
 
               addConnection(newConnection);
+
+              if (pendingRelationType) {
+                setPendingRelationType(null);
+              }
 
               const snapshot = captureConnectionSnapshot(newConnection);
               recordAuditLog(
@@ -117,6 +126,8 @@ export const Canvas: React.FC = () => {
       getEvidenceById,
       addConnection,
       endDrawingConnection,
+      pendingRelationType,
+      setPendingRelationType,
     ]
   );
 

@@ -1,26 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { X, FolderPlus, FolderOpen, Trash2 } from 'lucide-react';
+import { X, FolderPlus, FolderOpen, Trash2, LayoutTemplate } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { NeonInput } from '@/components/ui/NeonInput';
 import { GlowBorder } from '@/components/ui/GlowBorder';
+import { TemplateSelector } from '@/components/TemplateSelector';
 import { useUiStore } from '@/store/useUiStore';
 import { useCaseStore } from '@/store/useCaseStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
+import { useInvestigationTaskStore } from '@/store/useInvestigationTaskStore';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
 import type { Case } from '@/types';
+
+type ViewMode = 'list' | 'create' | 'template';
 
 export const CaseSelector: React.FC = () => {
   const caseSelectorOpen = useUiStore((state) => state.caseSelectorOpen);
   const setCaseSelectorOpen = useUiStore((state) => state.setCaseSelectorOpen);
-  const { cases, loading, loadCases, createCase, deleteCase, loadCase } = useCaseStore();
+  const { cases, loading, loadCases, createCase, loadCase } = useCaseStore();
   const setEvidence = useEvidenceStore((state) => state.setEvidence);
   const setConnections = useCanvasStore((state) => state.setConnections);
   const setZoom = useCanvasStore((state) => state.setZoom);
   const setPan = useCanvasStore((state) => state.setPan);
   const setSelectedId = useCanvasStore((state) => state.setSelectedId);
+  const { setTasks } = useInvestigationTaskStore();
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [newCaseName, setNewCaseName] = useState('');
   const [newCaseDescription, setNewCaseDescription] = useState('');
 
@@ -32,7 +37,7 @@ export const CaseSelector: React.FC = () => {
 
   const handleClose = () => {
     setCaseSelectorOpen(false);
-    setShowCreateForm(false);
+    setViewMode('list');
     setNewCaseName('');
     setNewCaseDescription('');
   };
@@ -44,7 +49,7 @@ export const CaseSelector: React.FC = () => {
     if (newCase) {
       setNewCaseName('');
       setNewCaseDescription('');
-      setShowCreateForm(false);
+      setViewMode('list');
       await handleSelectCase(newCase);
     }
   };
@@ -73,7 +78,7 @@ export const CaseSelector: React.FC = () => {
   const handleDeleteCase = async (e: React.MouseEvent, caseId: string) => {
     e.stopPropagation();
     if (confirm('确定要删除此案件吗？所有相关证据将被删除。')) {
-      await deleteCase(caseId);
+      await useCaseStore.getState().deleteCase(caseId);
     }
   };
 
@@ -121,7 +126,7 @@ export const CaseSelector: React.FC = () => {
             </div>
 
             <div className="p-6 max-h-[60vh] overflow-y-auto">
-              {!showCreateForm ? (
+              {viewMode === 'list' && (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center mb-4">
                     <span
@@ -130,14 +135,24 @@ export const CaseSelector: React.FC = () => {
                     >
                       共 {cases.length} 个案件
                     </span>
-                    <NeonButton
-                      size="sm"
-                      variant="primary"
-                      icon={<FolderPlus size={14} />}
-                      onClick={() => setShowCreateForm(true)}
-                    >
-                      新建案件
-                    </NeonButton>
+                    <div className="flex gap-2">
+                      <NeonButton
+                        size="sm"
+                        variant="secondary"
+                        icon={<LayoutTemplate size={14} />}
+                        onClick={() => setViewMode('template')}
+                      >
+                        从模板创建
+                      </NeonButton>
+                      <NeonButton
+                        size="sm"
+                        variant="primary"
+                        icon={<FolderPlus size={14} />}
+                        onClick={() => setViewMode('create')}
+                      >
+                        新建案件
+                      </NeonButton>
+                    </div>
                   </div>
 
                   {cases.length === 0 ? (
@@ -207,7 +222,9 @@ export const CaseSelector: React.FC = () => {
                     ))
                   )}
                 </div>
-              ) : (
+              )}
+
+              {viewMode === 'create' && (
                 <div className="space-y-4">
                   <h3
                     className="font-mono text-lg uppercase tracking-wider"
@@ -260,16 +277,23 @@ export const CaseSelector: React.FC = () => {
                     <NeonButton
                       variant="secondary"
                       onClick={() => {
-                        setShowCreateForm(false);
+                        setViewMode('list');
                         setNewCaseName('');
                         setNewCaseDescription('');
                       }}
                       className="flex-1"
                     >
-                      取消
+                      返回列表
                     </NeonButton>
                   </div>
                 </div>
+              )}
+
+              {viewMode === 'template' && (
+                <TemplateSelector
+                  onClose={handleClose}
+                  onBack={() => setViewMode('list')}
+                />
               )}
             </div>
           </div>

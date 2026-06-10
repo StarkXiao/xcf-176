@@ -7,10 +7,12 @@ import type {
   CreateCaseTemplateDto,
   UpdateCaseTemplateDto,
   ApplyTemplateDto,
+  ApplyTemplateResult,
   CaseWithRelations,
   CreateInvestigationTaskDto,
   Evidence,
   Connection,
+  InvestigationTask,
 } from '@shared/types';
 import { builtInTemplates } from '../data/builtInTemplates.js';
 
@@ -48,18 +50,21 @@ export const CaseTemplateService = {
     return CaseTemplateRepository.delete(id);
   },
 
-  applyTemplate: (dto: ApplyTemplateDto): CaseWithRelations => {
+  applyTemplate: (dto: ApplyTemplateDto): ApplyTemplateResult => {
     const template = CaseTemplateRepository.findById(dto.templateId);
     if (!template) {
       throw new Error('模板不存在');
     }
 
-    const newCase = CaseRepository.create({
-      name: dto.caseName,
-      description: dto.caseDescription ?? template.description,
-    });
+    const newCase = CaseRepository.create(
+      {
+        name: dto.caseName,
+        description: dto.caseDescription ?? template.description,
+      },
+      template
+    );
 
-    const tasks: ReturnType<typeof InvestigationTaskRepository.create>[] = [];
+    const tasks: InvestigationTask[] = [];
     const sortedSteps = [...template.investigationSteps].sort((a, b) => a.order - b.order);
 
     for (const step of sortedSteps) {
@@ -81,11 +86,20 @@ export const CaseTemplateService = {
     const connections: Connection[] = [];
     const collaborators = CollaboratorRepository.findByCaseId(newCase.id);
 
-    return {
+    const caseWithRelations: CaseWithRelations = {
       ...newCase,
       evidence,
       connections,
       collaborators,
+    };
+
+    return {
+      case: caseWithRelations,
+      template,
+      evidenceFields: template.evidenceFields,
+      relationTypes: template.relationTypes,
+      investigationSteps: template.investigationSteps,
+      createdTasks: tasks,
     };
   },
 

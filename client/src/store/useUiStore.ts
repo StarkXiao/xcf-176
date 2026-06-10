@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { TemplateRelationType } from '@/types';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -18,6 +19,7 @@ interface UiState {
   lastSaved: Date | null;
   currentTime: string;
   currentCollaboratorId: string | null;
+  pendingRelationType: TemplateRelationType | null;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   togglePropertyPanel: () => void;
@@ -44,6 +46,7 @@ interface UiState {
   updateLastSaved: () => void;
   updateCurrentTime: () => void;
   setCurrentCollaboratorId: (id: string | null) => void;
+  setPendingRelationType: (type: TemplateRelationType | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -62,6 +65,7 @@ export const useUiStore = create<UiState>((set) => ({
   lastSaved: null,
   currentTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
   currentCollaboratorId: null,
+  pendingRelationType: null,
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -107,4 +111,6 @@ export const useUiStore = create<UiState>((set) => ({
   },
 
   setCurrentCollaboratorId: (id) => set({ currentCollaboratorId: id }),
+
+  setPendingRelationType: (type) => set({ pendingRelationType: type }),
 }));

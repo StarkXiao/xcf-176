@@ -5,8 +5,8 @@ import type {
   CreateCaseTemplateDto,
   UpdateCaseTemplateDto,
   ApplyTemplateDto,
+  ApplyTemplateResult,
   ApiResponse,
-  CaseWithRelations,
 } from '@shared/types';
 
 interface TemplateIdParams {
@@ -201,7 +201,7 @@ export const CaseTemplateController = {
       }
 
       const newCase = CaseTemplateService.applyTemplate(req.body);
-      const response: ApiResponse<CaseWithRelations> = {
+      const response: ApiResponse<ApplyTemplateResult> = {
         success: true,
         data: newCase,
         message: '案件创建成功，已应用模板配置',

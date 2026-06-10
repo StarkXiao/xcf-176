@@ -28,6 +28,8 @@ const createTables = () => {
       status TEXT NOT NULL DEFAULT 'pending',
       key_clues TEXT DEFAULT '[]',
       canvas_state TEXT,
+      template_id TEXT,
+      template_metadata TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -270,6 +272,12 @@ const runMigrations = () => {
   }
   if (!caseColumnNames.includes('key_clues')) {
     db.exec("ALTER TABLE cases ADD COLUMN key_clues TEXT DEFAULT '[]'");
+  }
+  if (!caseColumnNames.includes('template_id')) {
+    db.exec('ALTER TABLE cases ADD COLUMN template_id TEXT');
+  }
+  if (!caseColumnNames.includes('template_metadata')) {
+    db.exec('ALTER TABLE cases ADD COLUMN template_metadata TEXT');
   }
 };
 

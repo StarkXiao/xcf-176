@@ -7,6 +7,14 @@ export interface Case {
   createdAt: string;
   updatedAt: string;
   canvasState?: CanvasState;
+  templateId?: string;
+  templateMetadata?: {
+    templateName: string;
+    category: CaseTemplateCategory;
+    evidenceFieldIds: string[];
+    relationTypeIds: string[];
+    investigationStepIds: string[];
+  };
 }
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'reviewed';
@@ -236,6 +244,8 @@ export interface UpdateCaseDto {
   status?: TaskStatus;
   keyClues?: string[];
   canvasState?: CanvasState;
+  templateId?: string | null;
+  templateMetadata?: Case['templateMetadata'] | null;
 }
 
 export interface CreateEvidenceDto {
@@ -610,6 +620,15 @@ export interface ApplyTemplateDto {
   caseName: string;
   caseDescription?: string;
   createdBy: string;
+}
+
+export interface ApplyTemplateResult {
+  case: CaseWithRelations;
+  template: CaseTemplate;
+  evidenceFields: TemplateEvidenceField[];
+  relationTypes: TemplateRelationType[];
+  investigationSteps: TemplateInvestigationStep[];
+  createdTasks: InvestigationTask[];
 }
 
 export interface ApiResponse<T> {

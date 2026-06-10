@@ -1,16 +1,17 @@
 import React, { useCallback } from 'react';
-import { Trash2, Palette, PenLine } from 'lucide-react';
+import { Trash2, Palette, PenLine, Sparkles } from 'lucide-react';
 import { NeonInput } from '@/components/ui/NeonInput';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
+import { useCaseTemplateStore } from '@/store/useCaseTemplateStore';
 import { connectionApi } from '@/api/connectionApi';
 import { captureConnectionSnapshot, recordAuditLog } from '@/utils/auditHelper';
 import {
   CYBERPUNK_COLORS,
   getGlowColor,
 } from '@/utils/colorUtils';
-import type { Connection } from '@/types';
+import type { Connection, TemplateRelationType } from '@/types';
 
 interface ConnectionEditorProps {
   connection: Connection;
@@ -38,18 +39,21 @@ export const ConnectionEditor: React.FC<ConnectionEditorProps> = ({ connection }
   const removeConnection = useCanvasStore((state) => state.removeConnection);
   const setSelectedConnectionId = useCanvasStore((state) => state.setSelectedConnectionId);
   const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
+  const appliedTemplateData = useCaseTemplateStore((state) => state.appliedTemplateData);
 
   const fromEvidence = getEvidenceById(connection.fromEvidenceId);
   const toEvidence = getEvidenceById(connection.toEvidenceId);
 
+  const presetRelations: TemplateRelationType[] = appliedTemplateData?.relationTypes ?? [];
+
   const handleUpdate = useCallback(
-    async (field: string, value: string) => {
+    async (field: 'label' | 'color' | 'lineStyle', value: string) => {
       const snapshot = captureConnectionSnapshot(connection);
       const patch: Partial<Connection> = { [field]: value };
       patchConnection(connection.id, patch);
 
       try {
-        await connectionApi.update(connection.id, { [field]: value });
+        await connectionApi.update(connection.id, patch);
         recordAuditLog(
           'update_connection',
           'connection',
@@ -58,7 +62,37 @@ export const ConnectionEditor: React.FC<ConnectionEditorProps> = ({ connection }
           snapshot
         );
       } catch {
-        patchConnection(connection.id, { [field]: (connection as unknown as Record<string, string>)[field] } as Partial<Connection>);
+        patchConnection(connection.id, { [field]: connection[field] } as Partial<Connection>);
+      }
+    },
+    [connection, patchConnection]
+  );
+
+  const handleApplyPreset = useCallback(
+    async (preset: TemplateRelationType) => {
+      const snapshot = captureConnectionSnapshot(connection);
+      const patch: Partial<Connection> = {
+        label: preset.label,
+        color: preset.color,
+        lineStyle: preset.lineStyle,
+      };
+      patchConnection(connection.id, patch);
+
+      try {
+        await connectionApi.update(connection.id, patch);
+        recordAuditLog(
+          'update_connection',
+          'connection',
+          connection.id,
+          `应用模板关系: ${preset.label}`,
+          snapshot
+        );
+      } catch {
+        patchConnection(connection.id, {
+          label: connection.label,
+          color: connection.color,
+          lineStyle: connection.lineStyle,
+        });
       }
     },
     [connection, patchConnection]
@@ -117,6 +151,43 @@ export const ConnectionEditor: React.FC<ConnectionEditorProps> = ({ connection }
           </span>
         </div>
       </div>
+
+      {presetRelations.length > 0 && (
+        <div className="space-y-2">
+          <label
+            className="block text-xs font-mono uppercase tracking-wider flex items-center gap-2"
+            style={{ color: CYBERPUNK_COLORS.accentCyan }}
+          >
+            <Sparkles size={14} />
+            模板预置关系
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {presetRelations.map((preset) => {
+              const isActive = connection.label === preset.label;
+              return (
+                <button
+                  key={preset.id}
+                  className="px-3 py-1.5 text-xs font-mono rounded-sm border transition-all hover:scale-105"
+                  style={{
+                    borderColor: isActive ? preset.color : CYBERPUNK_COLORS.borderColor,
+                    backgroundColor: isActive
+                      ? getGlowColor(preset.color, 0.15)
+                      : 'transparent',
+                    color: isActive ? preset.color : CYBERPUNK_COLORS.textSecondary,
+                    boxShadow: isActive
+                      ? `0 0 8px ${getGlowColor(preset.color, 0.4)}`
+                      : 'none',
+                  }}
+                  onClick={() => handleApplyPreset(preset)}
+                  title={preset.description}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div>
         <NeonInput

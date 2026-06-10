@@ -21,6 +21,7 @@ import {
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { CollaboratorSelector } from '@/components/CollaboratorSelector';
+import { TemplateInfoBadge } from '@/components/TemplateInfo';
 import { useUiStore } from '@/store/useUiStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useZoom } from '@/hooks/useZoom';
@@ -161,6 +162,13 @@ export const Toolbar: React.FC = () => {
         >
           导出
         </NeonButton>
+
+        <div
+          className="h-6 w-px mx-2"
+          style={{ backgroundColor: CYBERPUNK_COLORS.borderColor }}
+        />
+
+        <TemplateInfoBadge />
       </div>
 
       <div className="flex items-center gap-4">

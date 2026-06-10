@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Canvas } from '@/components/Canvas';
 import { PropertyPanel } from '@/components/PropertyPanel';
 import { CaseSelector } from '@/components/CaseSelector';
+import { TemplateEvidenceFields } from '@/components/TemplateEvidenceFields';
 import { CollaboratorPanel } from '@/components/CollaboratorPanel';
 import { TimelinePanel } from '@/components/TimelinePanel';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
@@ -15,6 +16,7 @@ import { ReportPanel } from '@/components/ReportPanel';
 import { ScanlineEffect } from '@/components/ui/ScanlineEffect';
 import { useUiStore } from '@/store/useUiStore';
 import { useCaseStore } from '@/store/useCaseStore';
+import { useCaseTemplateStore } from '@/store/useCaseTemplateStore';
 import { useCollaboratorStore } from '@/store/useCollaboratorStore';
 import { useAuditLogStore } from '@/store/useAuditLogStore';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
@@ -34,6 +36,10 @@ const Home: React.FC = () => {
   const reportPanelOpen = useUiStore((state) => state.reportPanelOpen);
   const loadCollaborators = useCollaboratorStore((state) => state.loadCollaborators);
   const loadAuditLogs = useAuditLogStore((state) => state.loadAuditLogs);
+  const loadAppliedTemplateForCase = useCaseTemplateStore((state) => state.loadAppliedTemplateForCase);
+  const setAppliedTemplateData = useCaseTemplateStore((state) => state.setAppliedTemplateData);
+
+  const hasTemplate = currentCase?.templateId != null;
 
   useDebouncedSave(500);
 
@@ -47,8 +53,16 @@ const Home: React.FC = () => {
     if (currentCase) {
       loadCollaborators(currentCase.id);
       loadAuditLogs(currentCase.id);
+      
+      if (currentCase.templateId) {
+        loadAppliedTemplateForCase(currentCase.id, currentCase.templateId);
+      } else {
+        setAppliedTemplateData(null);
+      }
+    } else {
+      setAppliedTemplateData(null);
     }
-  }, [currentCase, loadCollaborators, loadAuditLogs]);
+  }, [currentCase, loadCollaborators, loadAuditLogs, loadAppliedTemplateForCase, setAppliedTemplateData]);
 
   return (
     <div
@@ -58,6 +72,11 @@ const Home: React.FC = () => {
       <Toolbar />
 
       <div className="flex-1 flex overflow-hidden">
+        {hasTemplate && (
+          <div className="w-80 flex-shrink-0">
+            <TemplateEvidenceFields />
+          </div>
+        )}
         <Sidebar />
         <Canvas />
         {collaboratorPanelOpen && <CollaboratorPanel />}
