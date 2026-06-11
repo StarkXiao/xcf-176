@@ -1,14 +1,20 @@
 import { create } from 'zustand';
 import { caseApi } from '@/api/caseApi';
-import type { Case, CaseWithRelations } from '@/types';
+import type { Case, CaseWithRelations, CaseSearchFilters, CaseWithAggregatedData } from '@/types';
 
 interface CaseState {
   currentCase: CaseWithRelations | null;
   cases: Case[];
+  casesWithMeta: CaseWithAggregatedData[];
+  availableTags: string[];
+  availableSources: string[];
   loading: boolean;
   error: string | null;
   setCurrentCase: (caseData: CaseWithRelations | null) => void;
   loadCases: () => Promise<void>;
+  loadCasesWithMeta: () => Promise<void>;
+  loadFilterOptions: () => Promise<void>;
+  searchCases: (filters: CaseSearchFilters) => Promise<void>;
   loadCase: (id: string) => Promise<void>;
   createCase: (name: string, description?: string) => Promise<Case | null>;
   updateCase: (id: string, data: Partial<Case>) => Promise<void>;
@@ -18,6 +24,9 @@ interface CaseState {
 export const useCaseStore = create<CaseState>((set, get) => ({
   currentCase: null,
   cases: [],
+  casesWithMeta: [],
+  availableTags: [],
+  availableSources: [],
   loading: false,
   error: null,
 
@@ -31,6 +40,52 @@ export const useCaseStore = create<CaseState>((set, get) => ({
         set({ cases: response.data });
       } else {
         set({ error: response.error || 'Failed to load cases' });
+      }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  loadCasesWithMeta: async () => {
+    set({ loading: true, error: null });
+    try {
+      const response = await caseApi.getAllWithMeta();
+      if (response.success && response.data) {
+        set({ casesWithMeta: response.data, cases: response.data });
+      } else {
+        set({ error: response.error || 'Failed to load cases' });
+      }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  loadFilterOptions: async () => {
+    try {
+      const response = await caseApi.getFilterOptions();
+      if (response.success && response.data) {
+        set({
+          availableTags: response.data.tags,
+          availableSources: response.data.sources,
+        });
+      }
+    } catch (error) {
+      // ignore error, options will remain empty
+    }
+  },
+
+  searchCases: async (filters) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await caseApi.search(filters);
+      if (response.success && response.data) {
+        set({ casesWithMeta: response.data });
+      } else {
+        set({ error: response.error || 'Failed to search cases' });
       }
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -101,6 +156,7 @@ export const useCaseStore = create<CaseState>((set, get) => ({
       if (response.success) {
         set((state) => ({
           cases: state.cases.filter((c) => c.id !== id),
+          casesWithMeta: state.casesWithMeta.filter((c) => c.id !== id),
           currentCase: state.currentCase?.id === id ? null : state.currentCase,
         }));
       } else {

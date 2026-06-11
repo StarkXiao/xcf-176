@@ -67,6 +67,22 @@ export interface SearchFilter {
   dateRange?: { start: string; end: string };
 }
 
+export interface CaseSearchFilters {
+  keyword: string;
+  tags: string[];
+  sources: string[];
+  importance?: Evidence['importance'];
+  dateRange?: { start: string; end: string };
+  dateField?: 'createdAt' | 'updatedAt';
+}
+
+export interface CaseWithAggregatedData extends Case {
+  allTags: string[];
+  allSources: string[];
+  highestImportance: Evidence['importance'] | null;
+  evidenceCount: number;
+}
+
 export interface CaseWithRelations extends Case {
   evidence: Evidence[];
   connections: Connection[];

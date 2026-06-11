@@ -3,6 +3,9 @@ import { CaseController } from '../controllers/CaseController.js';
 
 export const caseRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/', CaseController.getAllCases);
+  fastify.get('/meta', CaseController.getAllCasesWithMeta);
+  fastify.get('/filter-options', CaseController.getCaseFilterOptions);
+  fastify.post('/search', CaseController.searchCases);
   fastify.get('/:id', CaseController.getCaseById);
   fastify.get('/:id/full', CaseController.getCaseWithRelations);
   fastify.post('/', CaseController.createCase);

@@ -1,9 +1,24 @@
 import { request } from './client';
-import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto, ApiResponse } from '@/types';
+import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto, ApiResponse, CaseSearchFilters, CaseWithAggregatedData } from '@/types';
 
 export const caseApi = {
   async getAll(): Promise<ApiResponse<Case[]>> {
     return request<Case[]>('/cases');
+  },
+
+  async getAllWithMeta(): Promise<ApiResponse<CaseWithAggregatedData[]>> {
+    return request<CaseWithAggregatedData[]>('/cases/meta');
+  },
+
+  async search(filters: CaseSearchFilters): Promise<ApiResponse<CaseWithAggregatedData[]>> {
+    return request<CaseWithAggregatedData[]>('/cases/search', {
+      method: 'POST',
+      body: JSON.stringify(filters),
+    });
+  },
+
+  async getFilterOptions(): Promise<ApiResponse<{ tags: string[]; sources: string[] }>> {
+    return request<{ tags: string[]; sources: string[] }>('/cases/filter-options');
   },
 
   async getById(id: string): Promise<ApiResponse<CaseWithRelations>> {

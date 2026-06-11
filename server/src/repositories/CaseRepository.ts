@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import db from '../database/index.js';
-import type { Case, CreateCaseDto, UpdateCaseDto, CanvasState, CaseTemplate } from '@shared/types';
+import type { Case, CreateCaseDto, UpdateCaseDto, CanvasState, CaseTemplate, CaseSearchFilters, CaseWithAggregatedData, Evidence } from '@shared/types';
 
 interface CaseRow {
   id: string;
@@ -116,5 +116,133 @@ export const CaseRepository = {
     const stmt = db.prepare('DELETE FROM cases WHERE id = ?');
     const result = stmt.run(id);
     return result.changes > 0;
+  },
+
+  findAllWithAggregatedData: (): CaseWithAggregatedData[] => {
+    const cases = CaseRepository.findAll();
+    const evidenceRows = db.prepare(
+      'SELECT case_id, source, importance, tags FROM evidence WHERE deleted_at IS NULL'
+    ).all() as Array<{ case_id: string; source: string; importance: string; tags: string }>;
+
+    const caseEvidenceMap = new Map<string, Array<{ source: string; importance: string; tags: string[] }>>();
+    for (const row of evidenceRows) {
+      if (!caseEvidenceMap.has(row.case_id)) {
+        caseEvidenceMap.set(row.case_id, []);
+      }
+      caseEvidenceMap.get(row.case_id)!.push({
+        source: row.source,
+        importance: row.importance,
+        tags: JSON.parse(row.tags) as string[],
+      });
+    }
+
+    const importanceOrder: Record<string, number> = { critical: 4, high: 3, normal: 2, low: 1 };
+
+    return cases.map((caseItem) => {
+      const evidences = caseEvidenceMap.get(caseItem.id) || [];
+      const allTags = new Set<string>();
+      const allSources = new Set<string>();
+      let highestImportance: Evidence['importance'] | null = null;
+      let highestImportanceRank = 0;
+
+      for (const ev of evidences) {
+        ev.tags.forEach((t) => allTags.add(t));
+        if (ev.source && ev.source !== 'unknown') {
+          allSources.add(ev.source);
+        }
+        const rank = importanceOrder[ev.importance] || 0;
+        if (rank > highestImportanceRank) {
+          highestImportanceRank = rank;
+          highestImportance = ev.importance as Evidence['importance'];
+        }
+      }
+
+      return {
+        ...caseItem,
+        allTags: Array.from(allTags).sort(),
+        allSources: Array.from(allSources).sort(),
+        highestImportance,
+        evidenceCount: evidences.length,
+      };
+    });
+  },
+
+  search: (filters: CaseSearchFilters): CaseWithAggregatedData[] => {
+    let cases = CaseRepository.findAllWithAggregatedData();
+    const importanceOrder: Record<string, number> = { critical: 4, high: 3, normal: 2, low: 1 };
+
+    if (filters.keyword && filters.keyword.trim()) {
+      const keyword = filters.keyword.trim().toLowerCase();
+      cases = cases.filter((c) => {
+        const matchesName = c.name.toLowerCase().includes(keyword);
+        const matchesDesc = c.description?.toLowerCase().includes(keyword);
+        const matchesTag = c.allTags.some((t) => t.toLowerCase().includes(keyword));
+        const matchesSource = c.allSources.some((s) => s.toLowerCase().includes(keyword));
+        return matchesName || matchesDesc || matchesTag || matchesSource;
+      });
+    }
+
+    if (filters.tags.length > 0) {
+      cases = cases.filter((c) =>
+        filters.tags.some((tag) => c.allTags.includes(tag))
+      );
+    }
+
+    if (filters.sources.length > 0) {
+      cases = cases.filter((c) =>
+        filters.sources.some((source) =>
+          c.allSources.some((s) => s === source || s.includes(source))
+        )
+      );
+    }
+
+    if (filters.importance) {
+      const targetRank = importanceOrder[filters.importance] || 0;
+      cases = cases.filter((c) => {
+        if (!c.highestImportance) return false;
+        return (importanceOrder[c.highestImportance] || 0) >= targetRank;
+      });
+    }
+
+    if (filters.dateRange && (filters.dateRange.start || filters.dateRange.end)) {
+      const dateField = filters.dateField || 'updatedAt';
+      cases = cases.filter((c) => {
+        const caseDate = new Date(c[dateField]).getTime();
+        if (filters.dateRange!.start) {
+          const start = new Date(filters.dateRange!.start).getTime();
+          if (caseDate < start) return false;
+        }
+        if (filters.dateRange!.end) {
+          const end = new Date(filters.dateRange!.end).getTime() + 24 * 60 * 60 * 1000;
+          if (caseDate >= end) return false;
+        }
+        return true;
+      });
+    }
+
+    return cases;
+  },
+
+  getAllAvailableTags: (): string[] => {
+    const rows = db.prepare(
+      'SELECT DISTINCT tags FROM evidence WHERE deleted_at IS NULL AND tags != \'[]\''
+    ).all() as Array<{ tags: string }>;
+    const tagSet = new Set<string>();
+    for (const row of rows) {
+      try {
+        const tags = JSON.parse(row.tags) as string[];
+        tags.forEach((t) => tagSet.add(t));
+      } catch {
+        // skip invalid JSON
+      }
+    }
+    return Array.from(tagSet).sort();
+  },
+
+  getAllAvailableSources: (): string[] => {
+    const rows = db.prepare(
+      'SELECT DISTINCT source FROM evidence WHERE deleted_at IS NULL AND source IS NOT NULL AND source != \'unknown\''
+    ).all() as Array<{ source: string }>;
+    return rows.map((r) => r.source).filter(Boolean).sort();
   },
 };

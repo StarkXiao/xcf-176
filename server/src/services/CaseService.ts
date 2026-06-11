@@ -4,7 +4,7 @@ import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
 import { CollaboratorRepository } from '../repositories/CollaboratorRepository.js';
 import { AnomalyAlertRepository } from '../repositories/AnomalyAlertRepository.js';
 import { AnomalyAlertService } from './AnomalyAlertService.js';
-import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto } from '@shared/types';
+import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto, CaseSearchFilters, CaseWithAggregatedData } from '@shared/types';
 
 export const CaseService = {
   getAllCases: (): Case[] => {
@@ -48,5 +48,21 @@ export const CaseService = {
     EvidenceRepository.deleteByCaseId(id);
     AnomalyAlertRepository.deleteByCaseId(id);
     return CaseRepository.delete(id);
+  },
+
+  searchCases: (filters: CaseSearchFilters): CaseWithAggregatedData[] => {
+    return CaseRepository.search(filters);
+  },
+
+  getAllCasesWithAggregatedData: (): CaseWithAggregatedData[] => {
+    return CaseRepository.findAllWithAggregatedData();
+  },
+
+  getAvailableCaseTags: (): string[] => {
+    return CaseRepository.getAllAvailableTags();
+  },
+
+  getAvailableCaseSources: (): string[] => {
+    return CaseRepository.getAllAvailableSources();
   },
 };

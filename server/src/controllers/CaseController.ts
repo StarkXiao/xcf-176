@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { CaseService } from '../services/CaseService.js';
 import { PersistenceService } from '../services/PersistenceService.js';
-import type { Case, CreateCaseDto, UpdateCaseDto, ApiResponse, CaseWithRelations } from '@shared/types';
+import type { Case, CreateCaseDto, UpdateCaseDto, ApiResponse, CaseWithRelations, CaseSearchFilters, CaseWithAggregatedData } from '@shared/types';
 
 interface CaseIdParams {
   Params: { id: string };
@@ -18,6 +18,59 @@ export const CaseController = {
       const response: ApiResponse<typeof cases> = {
         success: true,
         data: cases,
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async getAllCasesWithMeta(_req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const cases = CaseService.getAllCasesWithAggregatedData();
+      const response: ApiResponse<CaseWithAggregatedData[]> = {
+        success: true,
+        data: cases,
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async searchCases(req: FastifyRequest<{ Body: CaseSearchFilters }>, reply: FastifyReply) {
+    try {
+      const filters = req.body || { keyword: '', tags: [], sources: [] };
+      const cases = CaseService.searchCases(filters);
+      const response: ApiResponse<CaseWithAggregatedData[]> = {
+        success: true,
+        data: cases,
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async getCaseFilterOptions(_req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const tags = CaseService.getAvailableCaseTags();
+      const sources = CaseService.getAvailableCaseSources();
+      const response: ApiResponse<{ tags: string[]; sources: string[] }> = {
+        success: true,
+        data: { tags, sources },
       };
       return reply.send(response);
     } catch (error) {
