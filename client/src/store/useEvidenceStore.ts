@@ -147,6 +147,27 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
       const snapshot = existing ? captureEvidenceSnapshot(existing) : undefined;
       const response = await evidenceApi.delete(id);
       if (response.success) {
+        const { useCanvasStore } = await import('@/store/useCanvasStore');
+        const canvasState = useCanvasStore.getState();
+
+        const relatedConnectionIds = canvasState.connections
+          .filter((c) => c.fromEvidenceId === id || c.toEvidenceId === id)
+          .map((c) => c.id);
+        for (const connId of relatedConnectionIds) {
+          canvasState.removeConnection(connId);
+        }
+
+        if (canvasState.selectedId === id) {
+          canvasState.setSelectedId(null);
+        } else if (canvasState.selectedIds.has(id)) {
+          canvasState.removeFromSelection(id);
+        }
+
+        const currentSelectedConnId = useCanvasStore.getState().selectedConnectionId;
+        if (currentSelectedConnId && relatedConnectionIds.includes(currentSelectedConnId)) {
+          useCanvasStore.getState().setSelectedConnectionId(null);
+        }
+
         set((state) => {
           const newEvidence = { ...state.evidence };
           delete newEvidence[id];

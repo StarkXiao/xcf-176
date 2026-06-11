@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Settings, X } from 'lucide-react';
 import { EvidenceEditor } from './EvidenceEditor';
 import { ConnectionEditor } from './ConnectionEditor';
@@ -19,10 +19,30 @@ export const PropertyPanel: React.FC = () => {
 
   const selectedEvidenceIds = useMemo(() => Array.from(selectedIds), [selectedIds]);
   const isMultiSelect = selectedIds.size > 1;
-  const selectedEvidence = selectedId ? evidence[selectedId] : null;
+  const selectedEvidence = selectedId ? evidence[selectedId] ?? null : null;
   const selectedConnection = selectedConnectionId
     ? connections.find((c) => c.id === selectedConnectionId) ?? null
     : null;
+
+  const setSelectedId = useCanvasStore((state) => state.setSelectedId);
+  const setSelectedConnectionId = useCanvasStore((state) => state.setSelectedConnectionId);
+  const removeFromSelection = useCanvasStore((state) => state.removeFromSelection);
+
+  useEffect(() => {
+    if (selectedId && !evidence[selectedId]) {
+      setSelectedId(null);
+    }
+    const staleIds = Array.from(selectedIds).filter((id) => !evidence[id]);
+    for (const id of staleIds) {
+      removeFromSelection(id);
+    }
+  }, [selectedId, selectedIds, evidence, setSelectedId, removeFromSelection]);
+
+  useEffect(() => {
+    if (selectedConnectionId && !connections.some((c) => c.id === selectedConnectionId)) {
+      setSelectedConnectionId(null);
+    }
+  }, [selectedConnectionId, connections, setSelectedConnectionId]);
 
   if (!propertyPanelOpen) {
     return (
