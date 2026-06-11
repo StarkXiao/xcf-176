@@ -82,13 +82,14 @@ export const Toolbar: React.FC = () => {
   const canvasPanX = useCanvasStore((state) => state.panX);
   const canvasPanY = useCanvasStore((state) => state.panY);
   const connections = useCanvasStore((state) => state.connections);
+  const connectionGroups = useCanvasStore((state) => state.connectionGroups);
+  const isConnectionVisible = useCanvasStore((state) => state.isConnectionVisible);
   const visibleConnectionIds = useCanvasStore((state) => state.visibleConnectionIds);
   const hiddenConnectionIds = useCanvasStore((state) => state.hiddenConnectionIds);
   const timeRangeFilter = useCanvasStore((state) => state.timeRangeFilter);
   const arrangeByTimeline = useEvidenceStore((state) => state.arrangeByTimeline);
   const restorePositions = useEvidenceStore((state) => state.restorePositions);
   const previousPositions = useEvidenceStore((state) => state.previousPositions);
-  const evidenceList = useEvidenceStore((state) => state.getEvidenceArray());
   const searchFilters = useEvidenceStore((state) => state.searchFilters);
   const getFilteredEvidence = useEvidenceStore((state) => state.getFilteredEvidence);
   const currentCase = useCaseStore((state) => state.currentCase);
@@ -139,7 +140,7 @@ export const Toolbar: React.FC = () => {
     setSnapshotMenuOpen(false);
     try {
       const filteredEvidence = getFilteredEvidence();
-      const matchedEvidenceIds = filteredEvidence.map((e) => e.id);
+      const visibleConnections = connections.filter((c) => isConnectionVisible(c.id));
 
       const snapshot = await createCaseSnapshot({
         caseId: currentCase.id,
@@ -147,9 +148,9 @@ export const Toolbar: React.FC = () => {
         createdBy: currentCollaboratorId || 'system',
         createdByName: '当前操作员',
         filters: searchFilters,
-        matchedEvidenceIds,
-        evidence: evidenceList,
-        connections,
+        filteredEvidence,
+        visibleConnections,
+        connectionGroups,
         canvasZoom,
         canvasPanX,
         canvasPanY,

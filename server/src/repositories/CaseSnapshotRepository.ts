@@ -73,9 +73,6 @@ export const CaseSnapshotRepository = {
   create: (
     dto: CreateCaseSnapshotDto,
     caseName: string,
-    evidence: Evidence[],
-    connections: Connection[],
-    connectionGroups: ConnectionGroup[],
   ): CaseSnapshot => {
     const id = uuidv4();
     const now = new Date().toISOString();
@@ -100,9 +97,9 @@ export const CaseSnapshotRepository = {
       JSON.stringify(dto.filterState),
       JSON.stringify(dto.canvasLayout),
       JSON.stringify(dto.relationshipNotes ?? []),
-      JSON.stringify(evidence),
-      JSON.stringify(connections),
-      JSON.stringify(connectionGroups),
+      JSON.stringify(dto.evidence),
+      JSON.stringify(dto.connections),
+      JSON.stringify(dto.connectionGroups),
       now,
       now,
     );

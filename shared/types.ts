@@ -1070,6 +1070,9 @@ export interface CreateCaseSnapshotDto {
   filterState: CaseSnapshotFilterState;
   canvasLayout: CaseSnapshotCanvasLayout;
   relationshipNotes?: CaseSnapshotRelationshipNote[];
+  evidence: Evidence[];
+  connections: Connection[];
+  connectionGroups: ConnectionGroup[];
 }
 
 export interface UpdateCaseSnapshotDto {

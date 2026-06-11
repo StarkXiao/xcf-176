@@ -1,16 +1,10 @@
 import { CaseRepository } from '../repositories/CaseRepository.js';
-import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
-import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
-import { ConnectionGroupRepository } from '../repositories/ConnectionGroupRepository.js';
 import { CaseSnapshotRepository } from '../repositories/CaseSnapshotRepository.js';
 import type {
   CaseSnapshot,
   CaseSnapshotExportFormat,
   CreateCaseSnapshotDto,
   UpdateCaseSnapshotDto,
-  Evidence,
-  Connection,
-  ConnectionGroup,
 } from '@shared/types';
 
 function generateJsonExport(snapshot: CaseSnapshot): string {
@@ -388,16 +382,9 @@ export const CaseSnapshotService = {
       throw new Error(`案件不存在: ${dto.caseId}`);
     }
 
-    const evidence = EvidenceRepository.findByCaseId(dto.caseId);
-    const connections = ConnectionRepository.findByCaseId(dto.caseId);
-    const connectionGroups = ConnectionGroupRepository.findByCaseId(dto.caseId);
-
     return CaseSnapshotRepository.create(
       dto,
       caseData.name,
-      evidence as Evidence[],
-      connections as Connection[],
-      connectionGroups as ConnectionGroup[],
     );
   },
 

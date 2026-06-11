@@ -5,8 +5,10 @@ import type {
   CaseSnapshotExportFormat,
   CaseSnapshotFilterState,
   CaseSnapshotCanvasLayout,
+  CaseSnapshotRelationshipNote,
   Evidence,
   Connection,
+  ConnectionGroup,
 } from '@/types';
 
 function downloadFile(content: string, filename: string, mimeType: string) {
@@ -27,9 +29,9 @@ export async function createCaseSnapshot(params: {
   createdBy: string;
   createdByName: string;
   filters: SearchFilters;
-  matchedEvidenceIds: string[];
-  evidence: Evidence[];
-  connections: Connection[];
+  filteredEvidence: Evidence[];
+  visibleConnections: Connection[];
+  connectionGroups: ConnectionGroup[];
   canvasZoom: number;
   canvasPanX: number;
   canvasPanY: number;
@@ -46,9 +48,9 @@ export async function createCaseSnapshot(params: {
       createdBy,
       createdByName,
       filters,
-      matchedEvidenceIds,
-      evidence,
-      connections,
+      filteredEvidence,
+      visibleConnections,
+      connectionGroups,
       canvasZoom,
       canvasPanX,
       canvasPanY,
@@ -58,6 +60,9 @@ export async function createCaseSnapshot(params: {
       timelineMode,
     } = params;
 
+    const matchedEvidenceIds = filteredEvidence.map((e) => e.id);
+    const evidenceIdSet = new Set(matchedEvidenceIds);
+
     const filterState: CaseSnapshotFilterState = {
       keyword: filters.keyword,
       tags: filters.tags,
@@ -65,7 +70,7 @@ export async function createCaseSnapshot(params: {
       matchedEvidenceIds,
     };
 
-    const evidencePositions = evidence.map((e) => ({
+    const evidencePositions = filteredEvidence.map((e) => ({
       evidenceId: e.id,
       positionX: e.positionX,
       positionY: e.positionY,
@@ -75,9 +80,13 @@ export async function createCaseSnapshot(params: {
     }));
 
     const evidenceMap = new Map<string, Evidence>();
-    evidence.forEach((e) => evidenceMap.set(e.id, e));
+    filteredEvidence.forEach((e) => evidenceMap.set(e.id, e));
 
-    const relationshipNotes = connections.map((c) => {
+    const viewScopedConnections = visibleConnections.filter((c) => {
+      return evidenceIdSet.has(c.fromEvidenceId) && evidenceIdSet.has(c.toEvidenceId);
+    });
+
+    const relationshipNotes: CaseSnapshotRelationshipNote[] = viewScopedConnections.map((c) => {
       const fromEv = evidenceMap.get(c.fromEvidenceId);
       const toEv = evidenceMap.get(c.toEvidenceId);
       return {
@@ -112,6 +121,9 @@ export async function createCaseSnapshot(params: {
       filterState,
       canvasLayout,
       relationshipNotes,
+      evidence: filteredEvidence,
+      connections: viewScopedConnections,
+      connectionGroups,
     });
 
     if (response.success && response.data) {
