@@ -58,6 +58,8 @@ export interface CanvasState {
   zoom: number;
   panX: number;
   panY: number;
+  selectedId?: string | null;
+  selectedConnectionId?: string | null;
 }
 
 export interface SearchFilter {

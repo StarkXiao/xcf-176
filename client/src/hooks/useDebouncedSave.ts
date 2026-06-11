@@ -10,6 +10,11 @@ export function useDebouncedSave(delay: number = 500) {
   const currentCase = useCaseStore((state) => state.currentCase);
   const evidence = useEvidenceStore((state) => state.getEvidenceArray());
   const connections = useCanvasStore((state) => state.connections);
+  const zoom = useCanvasStore((state) => state.zoom);
+  const panX = useCanvasStore((state) => state.panX);
+  const panY = useCanvasStore((state) => state.panY);
+  const selectedId = useCanvasStore((state) => state.selectedId);
+  const selectedConnectionId = useCanvasStore((state) => state.selectedConnectionId);
   const setSaveStatus = useUiStore((state) => state.setSaveStatus);
   const updateLastSaved = useUiStore((state) => state.updateLastSaved);
 
@@ -46,12 +51,14 @@ export function useDebouncedSave(delay: number = 500) {
           await evidenceApi.bulkUpdate(evidenceUpdates);
         }
 
-        const canvasState = useCanvasStore.getState();
+        const canvasStore = useCanvasStore.getState();
         await caseApi.update(currentCase.id, {
           canvasState: {
-            zoom: canvasState.zoom,
-            panX: canvasState.panX,
-            panY: canvasState.panY,
+            zoom: canvasStore.zoom,
+            panX: canvasStore.panX,
+            panY: canvasStore.panY,
+            selectedId: canvasStore.selectedId,
+            selectedConnectionId: canvasStore.selectedConnectionId,
           },
         });
 
@@ -91,7 +98,16 @@ export function useDebouncedSave(delay: number = 500) {
     if (currentCase && evidence.length > 0) {
       scheduleSave();
     }
-  }, [currentCase?.id, evidence.length, connections.length]);
+  }, [
+    currentCase?.id,
+    evidence.length,
+    connections.length,
+    zoom,
+    panX,
+    panY,
+    selectedId,
+    selectedConnectionId,
+  ]);
 
   return {
     scheduleSave,

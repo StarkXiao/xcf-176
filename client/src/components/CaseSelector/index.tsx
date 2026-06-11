@@ -12,6 +12,7 @@ import { useInvestigationTaskStore } from '@/store/useInvestigationTaskStore';
 import { useAnomalyAlertStore } from '@/store/useAnomalyAlertStore';
 import { CYBERPUNK_COLORS, getGlowColor, IMPORTANCE_COLORS } from '@/utils/colorUtils';
 import type { Case, AnomalyAlertSeverity, CaseSearchFilters, CaseWithAggregatedData, ImportanceLevel } from '@/types';
+import { caseApi } from '@/api/caseApi';
 
 type ViewMode = 'list' | 'create' | 'template';
 
@@ -31,6 +32,7 @@ const dateFieldOptions: Array<{ value: 'createdAt' | 'updatedAt'; label: string 
 export const CaseSelector: React.FC = () => {
   const caseSelectorOpen = useUiStore((state) => state.caseSelectorOpen);
   const setCaseSelectorOpen = useUiStore((state) => state.setCaseSelectorOpen);
+  const currentCaseId = useCaseStore((state) => state.currentCase?.id);
   const {
     loading,
     loadCasesWithMeta,
@@ -73,6 +75,28 @@ export const CaseSelector: React.FC = () => {
     selectedId: string | null;
     selectedConnectionId: string | null;
   } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const saveCurrentCanvasState = async (): Promise<void> => {
+    if (!currentCaseId || isSaving) return;
+    setIsSaving(true);
+    try {
+      const canvasStore = useCanvasStore.getState();
+      await caseApi.update(currentCaseId, {
+        canvasState: {
+          zoom: canvasStore.zoom,
+          panX: canvasStore.panX,
+          panY: canvasStore.panY,
+          selectedId: canvasStore.selectedId,
+          selectedConnectionId: canvasStore.selectedConnectionId,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to save canvas state before case switch:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (caseSelectorOpen) {
@@ -101,7 +125,10 @@ export const CaseSelector: React.FC = () => {
     }
   }, [filters, startDate, endDate, caseSelectorOpen, searchCases]);
 
-  const handleClose = () => {
+  const handleClose = async () => {
+    if (currentCaseId) {
+      await saveCurrentCanvasState();
+    }
     setCaseSelectorOpen(false);
     setViewMode('list');
     setNewCaseName('');
@@ -138,6 +165,9 @@ export const CaseSelector: React.FC = () => {
   };
 
   const handleSelectCase = async (caseData: Case) => {
+    if (currentCaseId && currentCaseId !== caseData.id) {
+      await saveCurrentCanvasState();
+    }
     await loadCase(caseData.id);
 
     const currentCase = useCaseStore.getState().currentCase;
@@ -148,16 +178,29 @@ export const CaseSelector: React.FC = () => {
       if (currentCase.canvasState) {
         setZoom(currentCase.canvasState.zoom);
         setPan(currentCase.canvasState.panX, currentCase.canvasState.panY);
+        
+        const evidenceIds = new Set(currentCase.evidence.map((e) => e.id));
+        const connectionIds = new Set(currentCase.connections.map((c) => c.id));
+        
+        if (currentCase.canvasState.selectedId && evidenceIds.has(currentCase.canvasState.selectedId)) {
+          setSelectedId(currentCase.canvasState.selectedId);
+        } else if (currentCase.canvasState.selectedConnectionId && connectionIds.has(currentCase.canvasState.selectedConnectionId)) {
+          setSelectedConnectionId(currentCase.canvasState.selectedConnectionId);
+        } else {
+          setSelectedId(null);
+          setSelectedConnectionId(null);
+        }
       } else {
         setZoom(1);
         setPan(0, 0);
+        setSelectedId(null);
+        setSelectedConnectionId(null);
       }
-      setSelectedId(null);
-      setSelectedConnectionId(null);
     }
 
     setPreservedCanvasState(null);
-    handleClose();
+    setCaseSelectorOpen(false);
+    setViewMode('list');
   };
 
   const handleSelectPriorityCase = async (caseData: Case) => {

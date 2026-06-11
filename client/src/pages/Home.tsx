@@ -71,13 +71,26 @@ const Home: React.FC = () => {
       if (currentCase.canvasState) {
         setZoom(currentCase.canvasState.zoom);
         setPan(currentCase.canvasState.panX, currentCase.canvasState.panY);
+        
+        const evidenceIds = new Set(currentCase.evidence.map((e) => e.id));
+        const connectionIds = new Set(currentCase.connections.map((c) => c.id));
+        
+        if (currentCase.canvasState.selectedId && evidenceIds.has(currentCase.canvasState.selectedId)) {
+          setSelectedId(currentCase.canvasState.selectedId);
+          setSelectedConnectionId(null);
+        } else if (currentCase.canvasState.selectedConnectionId && connectionIds.has(currentCase.canvasState.selectedConnectionId)) {
+          setSelectedConnectionId(currentCase.canvasState.selectedConnectionId);
+          setSelectedId(null);
+        } else {
+          setSelectedId(null);
+          setSelectedConnectionId(null);
+        }
       } else {
         setZoom(1);
         setPan(0, 0);
+        setSelectedId(null);
+        setSelectedConnectionId(null);
       }
-      
-      setSelectedId(null);
-      setSelectedConnectionId(null);
 
       loadCollaborators(currentCase.id);
       loadAuditLogs(currentCase.id);
