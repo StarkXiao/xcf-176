@@ -19,6 +19,8 @@ import {
   FileText,
   AlertTriangle,
   GitCompare,
+  CalendarDays,
+  RotateCcw,
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -26,6 +28,7 @@ import { CollaboratorSelector } from '@/components/CollaboratorSelector';
 import { TemplateInfoBadge } from '@/components/TemplateInfo';
 import { useUiStore } from '@/store/useUiStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
+import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { useZoom } from '@/hooks/useZoom';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
@@ -61,6 +64,11 @@ export const Toolbar: React.FC = () => {
   const investigationTaskPanelOpen = useUiStore((state) => state.investigationTaskPanelOpen);
   const anomalyAlertPanelOpen = useUiStore((state) => state.anomalyAlertPanelOpen);
   const reportPanelOpen = useUiStore((state) => state.reportPanelOpen);
+  const timelineMode = useCanvasStore((state) => state.timelineMode);
+  const toggleTimelineMode = useCanvasStore((state) => state.toggleTimelineMode);
+  const arrangeByTimeline = useEvidenceStore((state) => state.arrangeByTimeline);
+  const restorePositions = useEvidenceStore((state) => state.restorePositions);
+  const previousPositions = useEvidenceStore((state) => state.previousPositions);
   const { forceSave } = useDebouncedSave();
 
   useEffect(() => {
@@ -82,6 +90,15 @@ export const Toolbar: React.FC = () => {
 
   const handleNewCase = () => {
     toggleCaseSelector();
+  };
+
+  const handleTimelineLayoutToggle = async () => {
+    if (!timelineMode) {
+      await arrangeByTimeline({ itemsPerRow: 4 });
+    } else {
+      await restorePositions();
+    }
+    toggleTimelineMode();
   };
 
   return (
@@ -154,6 +171,33 @@ export const Toolbar: React.FC = () => {
           onClick={resetView}
           glow={false}
         />
+
+        <div
+          className="h-6 w-px mx-2"
+          style={{ backgroundColor: CYBERPUNK_COLORS.borderColor }}
+        />
+
+        <NeonButton
+          size="sm"
+          variant={timelineMode ? 'success' : 'secondary'}
+          icon={<CalendarDays size={16} />}
+          onClick={handleTimelineLayoutToggle}
+          glow={timelineMode}
+          title={timelineMode ? '还原画布布局' : '按时间线排布画布'}
+        >
+          {timelineMode ? '时间线' : '时间排布'}
+        </NeonButton>
+
+        {previousPositions && (
+          <NeonButton
+            size="sm"
+            variant="warning"
+            icon={<RotateCcw size={16} />}
+            onClick={restorePositions}
+            title="还原原始位置"
+            glow={false}
+          />
+        )}
 
         <div
           className="h-6 w-px mx-2"

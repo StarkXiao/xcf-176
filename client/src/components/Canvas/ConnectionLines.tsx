@@ -9,15 +9,22 @@ import type { Connection } from '@/types';
 
 interface ConnectionLinesProps {
   zoom: number;
+  visibleConnectionIds?: Set<string> | null;
+  highlightConnectionIds?: Set<string> | null;
 }
 
-export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
+export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
+  zoom,
+  visibleConnectionIds = null,
+  highlightConnectionIds = null,
+}) => {
   const connections = useCanvasStore((state) => state.connections);
   const selectedConnectionId = useCanvasStore((state) => state.selectedConnectionId);
   const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
   const removeConnection = useCanvasStore((state) => state.removeConnection);
   const setSelectedConnectionId = useCanvasStore((state) => state.setSelectedConnectionId);
   const setSelectedId = useCanvasStore((state) => state.setSelectedId);
+  const setTimelineHighlightId = useCanvasStore((state) => state.setTimelineHighlightId);
 
   const getStrokeDasharray = (style: Connection['lineStyle']) => {
     switch (style) {
@@ -33,6 +40,9 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
   const handleConnectionClick = (e: React.MouseEvent, connectionId: string) => {
     e.stopPropagation();
     setSelectedConnectionId(connectionId);
+    setSelectedId(null);
+    setTimelineHighlightId(`cn-${connectionId}`);
+    setTimeout(() => setTimelineHighlightId(null), 2000);
   };
 
   const handleConnectionDoubleClick = async (e: React.MouseEvent, connectionId: string) => {
@@ -52,7 +62,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
         alert(res.error || '删除关联失败');
         return;
       }
-    } catch (err) {
+    } catch {
       alert('删除关联失败，请检查网络连接');
       return;
     }
@@ -85,24 +95,40 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
 
         if (!fromEvidence || !toEvidence) return null;
 
+        const isVisible = visibleConnectionIds === null || visibleConnectionIds.has(connection.id);
+        const isHighlighted = highlightConnectionIds !== null && highlightConnectionIds.has(connection.id);
+        const isSelected = selectedConnectionId === connection.id;
+        const opacity = isVisible ? (isHighlighted ? 1 : 1) : 0.15;
+        const dimmed = !isVisible;
+
         const { from, to } = getNearestEdge(fromEvidence, toEvidence);
         const path = getLinePath(from, to, 60);
         const midpoint = getLineMidpoint(from, to);
         const color = connection.color || CYBERPUNK_COLORS.accentCyan;
-        const isSelected = selectedConnectionId === connection.id;
 
         return (
-          <g key={connection.id} className="pointer-events-auto">
-            {isSelected && (
+          <g
+            key={connection.id}
+            className={`pointer-events-auto ${isHighlighted ? 'animate-pulse' : ''}`}
+            style={{
+              opacity,
+              transition: 'opacity 0.3s ease',
+              filter: dimmed ? 'grayscale(60%)' : 'none',
+            }}
+          >
+            {(isSelected || isHighlighted) && (
               <path
                 d={path}
                 fill="none"
-                stroke={CYBERPUNK_COLORS.accentYellow}
-                strokeWidth={6 / zoom}
-                strokeDasharray="8,4"
+                stroke={isHighlighted ? CYBERPUNK_COLORS.accentCyan : CYBERPUNK_COLORS.accentYellow}
+                strokeWidth={(isHighlighted ? 8 : 6) / zoom}
+                strokeDasharray={isHighlighted ? 'none' : '8,4'}
                 style={{
-                  filter: `drop-shadow(0 0 8px ${getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.6)})`,
-                  opacity: 0.6,
+                  filter: `drop-shadow(0 0 12px ${getGlowColor(
+                    isHighlighted ? CYBERPUNK_COLORS.accentCyan : CYBERPUNK_COLORS.accentYellow,
+                    0.8
+                  )})`,
+                  opacity: 0.7,
                 }}
               />
             )}
@@ -110,24 +136,28 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
               d={path}
               fill="none"
               stroke={color}
-              strokeWidth={2 / zoom}
+              strokeWidth={(isHighlighted ? 3 : 2) / zoom}
               strokeDasharray={getStrokeDasharray(connection.lineStyle)}
               filter="url(#glow)"
               style={{
-                filter: `drop-shadow(0 0 6px ${getGlowColor(color, 0.6)})`,
-                cursor: 'pointer',
+                filter: `drop-shadow(0 0 ${isHighlighted ? 10 : 6}px ${getGlowColor(color, isHighlighted ? 0.8 : 0.6)})`,
+                cursor: dimmed ? 'default' : 'pointer',
+                pointerEvents: dimmed ? 'none' : 'auto',
               }}
-              onClick={(e) => handleConnectionClick(e, connection.id)}
-              onDoubleClick={(e) => handleConnectionDoubleClick(e, connection.id)}
+              onClick={(e) => !dimmed && handleConnectionClick(e, connection.id)}
+              onDoubleClick={(e) => !dimmed && handleConnectionDoubleClick(e, connection.id)}
             />
             <path
               d={path}
               fill="none"
               stroke="transparent"
               strokeWidth={20 / zoom}
-              style={{ cursor: 'pointer' }}
-              onClick={(e) => handleConnectionClick(e, connection.id)}
-              onDoubleClick={(e) => handleConnectionDoubleClick(e, connection.id)}
+              style={{
+                cursor: dimmed ? 'default' : 'pointer',
+                pointerEvents: dimmed ? 'none' : 'auto',
+              }}
+              onClick={(e) => !dimmed && handleConnectionClick(e, connection.id)}
+              onDoubleClick={(e) => !dimmed && handleConnectionDoubleClick(e, connection.id)}
             />
 
             {connection.label && (
@@ -137,7 +167,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
                 width={120}
                 height={30}
                 style={{
-                  pointerEvents: 'none',
+                  pointerEvents: dimmed ? 'none' : 'none',
                   overflow: 'visible',
                 }}
               >
@@ -148,6 +178,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
                     color: color,
                     border: `1px solid ${color}`,
                     textShadow: `0 0 6px ${getGlowColor(color, 0.8)}`,
+                    opacity: dimmed ? 0.4 : 1,
+                    transition: 'opacity 0.3s ease',
                   }}
                 >
                   {connection.label}
@@ -158,10 +190,10 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ zoom }) => {
             <circle
               cx={to.x}
               cy={to.y}
-              r={6 / zoom}
+              r={(isHighlighted ? 8 : 6) / zoom}
               fill={color}
               style={{
-                filter: `drop-shadow(0 0 4px ${getGlowColor(color, 0.6)})`,
+                filter: `drop-shadow(0 0 ${isHighlighted ? 8 : 4}px ${getGlowColor(color, isHighlighted ? 0.9 : 0.6)})`,
               }}
             />
           </g>

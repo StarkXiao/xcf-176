@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { GridBackground } from './GridBackground';
 import { ConnectionLines } from './ConnectionLines';
 import { DrawingLine } from './DrawingLine';
@@ -13,8 +13,8 @@ import { useUiStore } from '@/store/useUiStore';
 import { connectionApi } from '@/api/connectionApi';
 import { generateConnectionId } from '@/utils/idGenerator';
 import { recordAuditLog, captureConnectionSnapshot } from '@/utils/auditHelper';
-import { CYBERPUNK_COLORS } from '@/utils/colorUtils';
-import type { Connection } from '@/types';
+import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
+import type { Connection, Evidence } from '@/types';
 
 export const Canvas: React.FC = () => {
   const {
@@ -50,6 +50,57 @@ export const Canvas: React.FC = () => {
   const currentCase = useCaseStore((state) => state.currentCase);
   const pendingRelationType = useUiStore((state) => state.pendingRelationType);
   const setPendingRelationType = useUiStore((state) => state.setPendingRelationType);
+  const timelineHighlightId = useCanvasStore((state) => state.timelineHighlightId);
+  const timeRangeFilter = useCanvasStore((state) => state.timeRangeFilter);
+
+  const timeRangeStats = useMemo(() => {
+    if (!timeRangeFilter.start && !timeRangeFilter.end) return null;
+    const startMs = timeRangeFilter.start ? new Date(timeRangeFilter.start).getTime() : -Infinity;
+    const endMs = timeRangeFilter.end ? new Date(timeRangeFilter.end).getTime() : Infinity;
+    return { startMs, endMs };
+  }, [timeRangeFilter]);
+
+  const { visibleEvidence, dimmedEvidenceIds, visibleConnectionIds } = useMemo(() => {
+    if (!timeRangeStats) {
+      return {
+        visibleEvidence: evidence,
+        dimmedEvidenceIds: new Set<string>(),
+        visibleConnectionIds: null as Set<string> | null,
+      };
+    }
+
+    const visible = new Set<string>();
+    const dimmed = new Set<string>();
+
+    evidence.forEach((ev: Evidence) => {
+      const ts = new Date(ev.timestamp || ev.createdAt).getTime();
+      if (ts >= timeRangeStats.startMs && ts <= timeRangeStats.endMs) {
+        visible.add(ev.id);
+      } else {
+        dimmed.add(ev.id);
+      }
+    });
+
+    const { connections } = useCanvasStore.getState();
+    const visibleConn = new Set<string>();
+    connections.forEach((c: Connection) => {
+      if (visible.has(c.fromEvidenceId) && visible.has(c.toEvidenceId)) {
+        visibleConn.add(c.id);
+      }
+    });
+
+    return {
+      visibleEvidence: evidence,
+      dimmedEvidenceIds: dimmed,
+      visibleConnectionIds: visibleConn,
+    };
+  }, [evidence, timeRangeStats]);
+
+  const isHighlighted = (evidenceId: string) => {
+    if (timelineHighlightId === `ev-${evidenceId}`) return true;
+    if (selectedId === evidenceId) return true;
+    return false;
+  };
 
   const handleCanvasMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -171,22 +222,76 @@ export const Canvas: React.FC = () => {
         className="absolute top-0 left-0 w-full h-full"
         style={canvasStyle}
       >
-        <ConnectionLines zoom={zoom} />
+        <ConnectionLines
+          zoom={zoom}
+          visibleConnectionIds={visibleConnectionIds}
+          highlightConnectionIds={timelineHighlightId?.startsWith('cn-') ? new Set([timelineHighlightId.slice(3)]) : null}
+        />
 
-        {evidence.map((item) => (
-          <EvidenceCard
-            key={item.id}
-            evidence={item}
-            isSelected={selectedId === item.id}
-            onMouseDown={(e) => handleCardMouseDown(e, item)}
-            onClick={(e) => handleCardClick(e, item.id)}
-            onConnectionStart={handleConnectionStart}
-            zoom={zoom}
-          />
-        ))}
+        {visibleEvidence.map((item) => {
+          const dimmed = dimmedEvidenceIds.has(item.id);
+          const highlighted = isHighlighted(item.id);
+
+          return (
+            <div
+              key={`wrapper-${item.id}`}
+              style={{
+                opacity: dimmed ? 0.2 : 1,
+                transition: 'opacity 0.3s ease',
+                filter: dimmed ? 'grayscale(50%)' : 'none',
+                pointerEvents: dimmed ? 'none' : 'auto',
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: '100%',
+                height: '100%',
+              }}
+            >
+              <EvidenceCard
+                evidence={item}
+                isSelected={highlighted || selectedId === item.id}
+                onMouseDown={(e) => handleCardMouseDown(e, item)}
+                onClick={(e) => handleCardClick(e, item.id)}
+                onConnectionStart={handleConnectionStart}
+                zoom={zoom}
+                highlighted={highlighted}
+              />
+            </div>
+          );
+        })}
 
         <DrawingLine zoom={zoom} />
       </div>
+
+      {timeRangeStats && (
+        <div
+          className="absolute top-2 left-2 px-3 py-1.5 rounded-sm border text-xs font-mono flex items-center gap-2 z-40"
+          style={{
+            backgroundColor: getGlowColor(CYBERPUNK_COLORS.bgSecondary, 0.9),
+            borderColor: CYBERPUNK_COLORS.accentPurple,
+            color: CYBERPUNK_COLORS.accentPurple,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <span>时间过滤已激活</span>
+          <span style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+            ({visibleEvidence.length - dimmedEvidenceIds.size}/{visibleEvidence.length} 条证据)
+          </span>
+        </div>
+      )}
+
+      {timelineHighlightId && (
+        <div
+          className="absolute top-2 right-2 px-3 py-1.5 rounded-sm border text-xs font-mono z-40 animate-pulse"
+          style={{
+            backgroundColor: getGlowColor(CYBERPUNK_COLORS.bgSecondary, 0.9),
+            borderColor: CYBERPUNK_COLORS.accentCyan,
+            color: CYBERPUNK_COLORS.accentCyan,
+          }}
+        >
+          已定位: {timelineHighlightId.startsWith('ev-') ? '证据卡片' : timelineHighlightId.startsWith('cn-') ? '关联关系' : '记录'}
+        </div>
+      )}
 
       <ScanlineEffect />
     </div>

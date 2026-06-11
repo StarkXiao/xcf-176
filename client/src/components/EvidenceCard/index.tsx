@@ -14,6 +14,7 @@ interface EvidenceCardProps {
   onClick: (e: React.MouseEvent, evidenceId: string) => void;
   onConnectionStart: (evidenceId: string, x: number, y: number) => void;
   zoom: number;
+  highlighted?: boolean;
 }
 
 export const EvidenceCard: React.FC<EvidenceCardProps> = ({
@@ -23,6 +24,7 @@ export const EvidenceCard: React.FC<EvidenceCardProps> = ({
   onClick,
   onConnectionStart,
   zoom,
+  highlighted = false,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -60,34 +62,41 @@ export const EvidenceCard: React.FC<EvidenceCardProps> = ({
     { edge: 'left', style: { top: '50%', left: 0, transform: 'translate(-50%, -50%)' } },
   ] as const;
 
+  const showGlow = isSelected || highlighted;
+
   return (
     <div
       ref={cardRef}
       data-evidence-card
       data-evidence-id={evidence.id}
-      className="absolute flex flex-col select-none"
+      className={`absolute flex flex-col select-none ${highlighted ? 'animate-pulse' : ''}`}
       style={{
         left: evidence.positionX,
         top: evidence.positionY,
         width: evidence.width,
         height: evidence.height,
-        zIndex: isSelected ? 100 : 10,
-        transition: 'box-shadow 0.2s ease',
+        zIndex: showGlow ? 100 : 10,
+        transition: 'box-shadow 0.2s ease, transform 0.2s ease',
+        transform: highlighted ? 'scale(1.02)' : 'scale(1)',
       }}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
     >
       <GlowBorder
         color={evidence.color}
-        glowIntensity={isSelected ? 0.8 : 0.4}
-        pulse={isSelected}
+        glowIntensity={showGlow ? 0.9 : 0.4}
+        pulse={showGlow}
         className="w-full h-full"
       >
         <div
           className="w-full h-full flex flex-col rounded-sm overflow-hidden"
           style={{
-            backgroundColor: CYBERPUNK_COLORS.bgSecondary,
-            boxShadow: isSelected ? getBoxShadow(evidence.color, 20) : getBoxShadow(evidence.color, 5),
+            backgroundColor: highlighted
+              ? getGlowColor(evidence.color, 0.08)
+              : CYBERPUNK_COLORS.bgSecondary,
+            boxShadow: showGlow
+              ? getBoxShadow(evidence.color, 25)
+              : getBoxShadow(evidence.color, 5),
           }}
         >
           <CardHeader evidence={evidence} zoom={zoom} />

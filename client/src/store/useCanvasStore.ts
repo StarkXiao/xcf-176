@@ -9,6 +9,11 @@ interface DrawingConnection {
   endY: number;
 }
 
+export interface TimeRangeFilter {
+  start: string | null;
+  end: string | null;
+}
+
 interface CanvasState {
   zoom: number;
   panX: number;
@@ -18,6 +23,9 @@ interface CanvasState {
   connections: Connection[];
   drawingConnection: DrawingConnection | null;
   isPanning: boolean;
+  timelineMode: boolean;
+  timelineHighlightId: string | null;
+  timeRangeFilter: TimeRangeFilter;
   setZoom: (zoom: number) => void;
   setPan: (x: number, y: number) => void;
   setSelectedId: (id: string | null) => void;
@@ -32,6 +40,11 @@ interface CanvasState {
   endDrawingConnection: () => void;
   setIsPanning: (panning: boolean) => void;
   resetView: () => void;
+  setTimelineMode: (enabled: boolean) => void;
+  toggleTimelineMode: () => void;
+  setTimelineHighlightId: (id: string | null) => void;
+  setTimeRangeFilter: (filter: Partial<TimeRangeFilter>) => void;
+  clearTimeRangeFilter: () => void;
 }
 
 const MIN_ZOOM = 0.25;
@@ -46,6 +59,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   connections: [],
   drawingConnection: null,
   isPanning: false,
+  timelineMode: false,
+  timelineHighlightId: null,
+  timeRangeFilter: { start: null, end: null },
 
   setZoom: (zoom) => {
     const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
@@ -113,4 +129,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setIsPanning: (panning) => set({ isPanning: panning }),
 
   resetView: () => set({ zoom: 1, panX: 0, panY: 0 }),
+
+  setTimelineMode: (enabled) => set({ timelineMode: enabled }),
+
+  toggleTimelineMode: () => set((state) => ({ timelineMode: !state.timelineMode })),
+
+  setTimelineHighlightId: (id) => set({ timelineHighlightId: id }),
+
+  setTimeRangeFilter: (filter) =>
+    set((state) => ({
+      timeRangeFilter: { ...state.timeRangeFilter, ...filter },
+    })),
+
+  clearTimeRangeFilter: () =>
+    set({ timeRangeFilter: { start: null, end: null } }),
 }));
