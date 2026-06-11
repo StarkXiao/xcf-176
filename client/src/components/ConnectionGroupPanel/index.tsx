@@ -396,7 +396,7 @@ export const ConnectionGroupPanel: React.FC = () => {
                       ))}
                     </div>
                     <NeonButton
-                      size="xs"
+                      size="sm"
                       variant="primary"
                       icon={<Paintbrush size={12} />}
                       onClick={() => handleBulkUpdateByType(stat, stat.color)}
@@ -472,7 +472,7 @@ export const ConnectionGroupPanel: React.FC = () => {
                       ))}
                     </div>
                     <NeonButton
-                      size="xs"
+                      size="sm"
                       variant="secondary"
                       icon={group.visible ? <Eye size={12} /> : <EyeOff size={12} />}
                       onClick={() => handleToggleGroupVisibility(group.id)}
@@ -480,7 +480,7 @@ export const ConnectionGroupPanel: React.FC = () => {
                       title={group.visible ? '隐藏分组' : '显示分组'}
                     />
                     <NeonButton
-                      size="xs"
+                      size="sm"
                       variant="danger"
                       icon={<Trash2 size={12} />}
                       onClick={() => handleDeleteGroup(group.id)}

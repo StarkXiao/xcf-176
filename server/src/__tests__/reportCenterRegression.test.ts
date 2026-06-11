@@ -108,7 +108,7 @@ function seedFullCase() {
       tags: ['域名', '注册信息'],
       status: 'pending',
       timestamp: ts(1, 16),
-      assignedTo: null,
+      assignedTo: undefined,
     },
   ]);
   seedTestConnection(db, CASE_ID, [
@@ -148,7 +148,7 @@ function seedFullCase() {
       title: '核实钓鱼网站注册信息',
       priority: 'normal',
       status: 'pending',
-      assigneeId: null,
+      assigneeId: undefined,
       deadline: ts(-5, 0),
       createdBy: COL_C_ID,
       createdByName: COL_C_NAME,

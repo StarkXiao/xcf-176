@@ -3,17 +3,17 @@ import { ConnectionGroupController } from '../controllers/ConnectionGroupControl
 
 export const connectionGroupRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/', ConnectionGroupController.getAllGroups);
-  fastify.get('/:id', ConnectionGroupController.getGroupById);
   fastify.get('/case/:caseId', ConnectionGroupController.getGroupsByCaseId);
   fastify.get('/stats/:caseId', ConnectionGroupController.getConnectionTypeStats);
   fastify.post('/', ConnectionGroupController.createGroup);
-  fastify.put('/:id', ConnectionGroupController.updateGroup);
-  fastify.delete('/:id', ConnectionGroupController.deleteGroup);
   fastify.post('/bulk/by-type', ConnectionGroupController.bulkUpdateByRelationType);
   fastify.post('/bulk/by-label', ConnectionGroupController.bulkUpdateByLabel);
   fastify.post('/bulk/apply-style', ConnectionGroupController.bulkApplyStyle);
+  fastify.post('/auto-create', ConnectionGroupController.autoCreateGroupsFromTypes);
+  fastify.get('/:id', ConnectionGroupController.getGroupById);
+  fastify.put('/:id', ConnectionGroupController.updateGroup);
+  fastify.delete('/:id', ConnectionGroupController.deleteGroup);
   fastify.post('/:id/toggle-visibility', ConnectionGroupController.toggleGroupVisibility);
   fastify.post('/:id/add-connection', ConnectionGroupController.addConnectionToGroup);
   fastify.post('/:id/remove-connection', ConnectionGroupController.removeConnectionFromGroup);
-  fastify.post('/auto-create', ConnectionGroupController.autoCreateGroupsFromTypes);
 };

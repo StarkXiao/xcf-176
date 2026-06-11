@@ -21,9 +21,15 @@ export const ConnectionGroupService = {
   },
 
   updateGroup: (id: string, dto: UpdateConnectionGroupDto): ConnectionGroup | null => {
+    const existing = ConnectionGroupRepository.findById(id);
+    if (!existing) return null;
+
     const group = ConnectionGroupRepository.update(id, dto);
-    if (group && dto.color && dto.connectionIds && dto.connectionIds.length > 0) {
-      ConnectionRepository.bulkUpdateByIds(dto.connectionIds, { color: dto.color });
+    if (group && dto.color) {
+      const connectionIds = dto.connectionIds ?? existing.connectionIds;
+      if (connectionIds.length > 0) {
+        ConnectionRepository.bulkUpdateByIds(connectionIds, { color: dto.color });
+      }
     }
     return group;
   },

@@ -26,6 +26,7 @@ import { useInvestigationTaskStore } from '@/store/useInvestigationTaskStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
+import { connectionApi } from '@/api/connectionApi';
 import { CYBERPUNK_COLORS } from '@/utils/colorUtils';
 
 const Home: React.FC = () => {
@@ -48,6 +49,8 @@ const Home: React.FC = () => {
   const loadTasks = useInvestigationTaskStore((state) => state.loadTasks);
   const setEvidence = useEvidenceStore((state) => state.setEvidence);
   const setConnections = useCanvasStore((state) => state.setConnections);
+  const setConnectionGroups = useCanvasStore((state) => state.setConnectionGroups);
+  const resetConnectionVisibility = useCanvasStore((state) => state.resetConnectionVisibility);
   const setZoom = useCanvasStore((state) => state.setZoom);
   const setPan = useCanvasStore((state) => state.setPan);
   const setSelectedId = useCanvasStore((state) => state.setSelectedId);
@@ -97,6 +100,15 @@ const Home: React.FC = () => {
       loadCollaborators(currentCase.id);
       loadAuditLogs(currentCase.id);
       loadTasks(currentCase.id);
+
+      resetConnectionVisibility();
+      connectionApi.getGroupsByCaseId(currentCase.id).then((res) => {
+        if (res.success && res.data) {
+          setConnectionGroups(res.data);
+        }
+      }).catch((err) => {
+        console.error('Failed to load connection groups:', err);
+      });
       
       if (currentCase.templateId) {
         loadAppliedTemplateForCase(currentCase.id, currentCase.templateId);
@@ -105,11 +117,15 @@ const Home: React.FC = () => {
       }
     } else {
       setAppliedTemplateData(null);
+      setConnectionGroups([]);
+      resetConnectionVisibility();
     }
   }, [
     currentCase,
     setEvidence,
     setConnections,
+    setConnectionGroups,
+    resetConnectionVisibility,
     setZoom,
     setPan,
     setSelectedId,
