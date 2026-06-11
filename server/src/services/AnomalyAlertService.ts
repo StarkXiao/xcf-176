@@ -491,21 +491,22 @@ export const AnomalyAlertService = {
 
     AnomalyAlertRepository.deletePendingByCaseId(caseId);
 
-    const alerts = detectCaseAnomalies(caseData, evidence, connections, mergedConfig);
-    const caseAlerts = AnomalyAlertRepository.findByCaseId(caseId);
+    const newAlerts = detectCaseAnomalies(caseData, evidence, connections, mergedConfig);
+    const allCaseAlerts = AnomalyAlertRepository.findByCaseId(caseId);
+    const activeAlerts = newAlerts;
 
-    const overallScore = caseAlerts.length > 0
-      ? caseAlerts.reduce((sum, a) => sum + a.score, 0) / caseAlerts.length
+    const overallScore = activeAlerts.length > 0
+      ? activeAlerts.reduce((sum, a) => sum + a.score, 0) / activeAlerts.length
       : 0;
 
     const priorityLevel = resolveSeverity(overallScore);
 
     const recommendations: string[] = [];
-    const hasCombined = caseAlerts.some((a) => a.type === 'combined');
-    const hasCritical = caseAlerts.some((a) => a.severity === 'critical');
-    const hasHighImportance = caseAlerts.some((a) => a.type === 'high_importance');
-    const hasDenseConnections = caseAlerts.some((a) => a.type === 'dense_connections');
-    const hasTemporalBurst = caseAlerts.some((a) => a.type === 'temporal_burst');
+    const hasCombined = activeAlerts.some((a) => a.type === 'combined');
+    const hasCritical = activeAlerts.some((a) => a.severity === 'critical');
+    const hasHighImportance = activeAlerts.some((a) => a.type === 'high_importance');
+    const hasDenseConnections = activeAlerts.some((a) => a.type === 'dense_connections');
+    const hasTemporalBurst = activeAlerts.some((a) => a.type === 'temporal_burst');
 
     if (hasCombined || hasCritical) {
       recommendations.push('此案件具有多项高风险特征，建议立即列为优先核查对象。');
@@ -524,17 +525,18 @@ export const AnomalyAlertService = {
     }
 
     let summary = '';
-    if (caseAlerts.length === 0) {
+    if (activeAlerts.length === 0) {
       summary = `案件「${caseData.name}」未检测到明显异常线索。`;
     } else {
       const severityText = priorityLevel === 'critical' ? '重大风险' : priorityLevel === 'high' ? '高风险' : '中等风险';
-      summary = `案件「${caseData.name}」检测到 ${caseAlerts.length} 个异常预警（${severityText}），综合评分 ${(overallScore * 100).toFixed(0)}/100。`;
+      const pendingCount = allCaseAlerts.filter((a) => a.status === 'pending').length;
+      summary = `案件「${caseData.name}」检测到 ${pendingCount} 个待处理预警（${severityText}），综合评分 ${(overallScore * 100).toFixed(0)}/100。`;
     }
 
     return {
       caseId,
       caseName: caseData.name,
-      alerts: caseAlerts,
+      alerts: allCaseAlerts,
       overallScore,
       priorityLevel,
       summary,
