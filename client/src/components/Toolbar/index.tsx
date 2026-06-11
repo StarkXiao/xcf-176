@@ -141,6 +141,13 @@ export const Toolbar: React.FC = () => {
     try {
       const filteredEvidence = getFilteredEvidence();
       const visibleConnections = connections.filter((c) => isConnectionVisible(c.id));
+      const visibleConnectionIdSet = new Set(visibleConnections.map((c) => c.id));
+      const preFilteredGroups = connectionGroups
+        .map((g) => ({
+          ...g,
+          connectionIds: g.connectionIds.filter((cid) => visibleConnectionIdSet.has(cid)),
+        }))
+        .filter((g) => g.connectionIds.length > 0);
 
       const snapshot = await createCaseSnapshot({
         caseId: currentCase.id,
@@ -150,7 +157,7 @@ export const Toolbar: React.FC = () => {
         filters: searchFilters,
         filteredEvidence,
         visibleConnections,
-        connectionGroups,
+        connectionGroups: preFilteredGroups,
         canvasZoom,
         canvasPanX,
         canvasPanY,

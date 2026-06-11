@@ -86,6 +86,15 @@ export async function createCaseSnapshot(params: {
       return evidenceIdSet.has(c.fromEvidenceId) && evidenceIdSet.has(c.toEvidenceId);
     });
 
+    const viewScopedConnectionIdSet = new Set(viewScopedConnections.map((c) => c.id));
+
+    const viewScopedConnectionGroups = connectionGroups
+      .map((g) => ({
+        ...g,
+        connectionIds: g.connectionIds.filter((cid) => viewScopedConnectionIdSet.has(cid)),
+      }))
+      .filter((g) => g.connectionIds.length > 0);
+
     const relationshipNotes: CaseSnapshotRelationshipNote[] = viewScopedConnections.map((c) => {
       const fromEv = evidenceMap.get(c.fromEvidenceId);
       const toEv = evidenceMap.get(c.toEvidenceId);
@@ -123,7 +132,7 @@ export async function createCaseSnapshot(params: {
       relationshipNotes,
       evidence: filteredEvidence,
       connections: viewScopedConnections,
-      connectionGroups,
+      connectionGroups: viewScopedConnectionGroups,
     });
 
     if (response.success && response.data) {
