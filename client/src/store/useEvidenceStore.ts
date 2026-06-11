@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { evidenceApi } from '@/api/evidenceApi';
 import { recordAuditLog, captureEvidenceSnapshot } from '@/utils/auditHelper';
-import type { Evidence, UpdateEvidenceDto, CreateEvidenceDto } from '@/types';
+import type { Evidence, UpdateEvidenceDto, CreateEvidenceDto, SearchFilters } from '@/types';
 
 export interface TimelineLayoutConfig {
   startX?: number;
@@ -19,6 +19,7 @@ interface EvidenceState {
   loading: boolean;
   error: string | null;
   previousPositions: Record<string, { x: number; y: number }> | null;
+  searchFilters: SearchFilters;
   getEvidenceArray: () => Evidence[];
   getEvidenceById: (id: string) => Evidence | undefined;
   addEvidence: (data: CreateEvidenceDto) => Promise<Evidence | null>;
@@ -29,6 +30,8 @@ interface EvidenceState {
   bulkUpdateEvidence: (updates: Array<{ id: string; data: UpdateEvidenceDto }>, collaboratorId?: string, collaboratorName?: string) => Promise<void>;
   arrangeByTimeline: (config?: TimelineLayoutConfig) => Promise<void>;
   restorePositions: () => Promise<void>;
+  setSearchFilters: (filters: SearchFilters) => void;
+  getFilteredEvidence: () => Evidence[];
 }
 
 export const useEvidenceStore = create<EvidenceState>((set, get) => ({
@@ -36,6 +39,11 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
   loading: false,
   error: null,
   previousPositions: null,
+  searchFilters: {
+    keyword: '',
+    tags: [],
+    importance: undefined,
+  },
 
   getEvidenceArray: () => Object.values(get().evidence),
 
@@ -47,6 +55,33 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
       evidenceMap[e.id] = e;
     });
     set({ evidence: evidenceMap });
+  },
+
+  setSearchFilters: (filters) => set({ searchFilters: filters }),
+
+  getFilteredEvidence: () => {
+    const { evidence, searchFilters } = get();
+    const evidenceList = Object.values(evidence);
+    return evidenceList.filter((ev) => {
+      if (searchFilters.keyword) {
+        const keyword = searchFilters.keyword.toLowerCase();
+        const matchesContent = ev.content.toLowerCase().includes(keyword);
+        const matchesSource = ev.source?.toLowerCase().includes(keyword);
+        const matchesTags = ev.tags.some((t) => t.toLowerCase().includes(keyword));
+        if (!matchesContent && !matchesSource && !matchesTags) return false;
+      }
+
+      if (searchFilters.tags.length > 0) {
+        const hasTag = searchFilters.tags.some((t) => ev.tags.includes(t));
+        if (!hasTag) return false;
+      }
+
+      if (searchFilters.importance && ev.importance !== searchFilters.importance) {
+        return false;
+      }
+
+      return true;
+    });
   },
 
   addEvidence: async (data) => {

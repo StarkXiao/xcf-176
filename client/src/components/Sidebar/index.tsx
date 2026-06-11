@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Plus, Database } from 'lucide-react';
 import { SearchFilter } from './SearchFilter';
 import { EvidenceListItem } from './EvidenceListItem';
@@ -13,37 +13,14 @@ import type { Evidence, SearchFilters } from '@/types';
 export const Sidebar: React.FC = () => {
   const currentCase = useCaseStore((state) => state.currentCase);
   const evidenceList = useEvidenceStore((state) => state.getEvidenceArray());
+  const searchFilters = useEvidenceStore((state) => state.searchFilters);
+  const setSearchFilters = useEvidenceStore((state) => state.setSearchFilters);
+  const getFilteredEvidence = useEvidenceStore((state) => state.getFilteredEvidence);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
   const toggleSelectedId = useCanvasStore((state) => state.toggleSelectedId);
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
-  const [filters, setFilters] = useState<SearchFilters>({
-    keyword: '',
-    tags: [],
-    importance: undefined,
-  });
 
-  const filteredEvidence = useMemo(() => {
-    return evidenceList.filter((evidence) => {
-      if (filters.keyword) {
-        const keyword = filters.keyword.toLowerCase();
-        const matchesContent = evidence.content.toLowerCase().includes(keyword);
-        const matchesSource = evidence.source?.toLowerCase().includes(keyword);
-        const matchesTags = evidence.tags.some((t) => t.toLowerCase().includes(keyword));
-        if (!matchesContent && !matchesSource && !matchesTags) return false;
-      }
-
-      if (filters.tags.length > 0) {
-        const hasTag = filters.tags.some((t) => evidence.tags.includes(t));
-        if (!hasTag) return false;
-      }
-
-      if (filters.importance && evidence.importance !== filters.importance) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [evidenceList, filters]);
+  const filteredEvidence = useMemo(() => getFilteredEvidence(), [getFilteredEvidence, searchFilters, evidenceList]);
 
   const handleDragStart = (e: React.DragEvent, evidence: Evidence) => {
     e.dataTransfer.effectAllowed = 'copy';
@@ -138,7 +115,7 @@ export const Sidebar: React.FC = () => {
         <NeonButton size="sm" variant="primary" icon={<Plus size={14} />} onClick={handleAddEvidence} />
       </div>
 
-      <SearchFilter filters={filters} onFiltersChange={setFilters} />
+      <SearchFilter filters={searchFilters} onFiltersChange={setSearchFilters} />
 
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {filteredEvidence.length === 0 ? (

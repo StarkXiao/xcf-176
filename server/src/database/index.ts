@@ -337,6 +337,30 @@ const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_evidence_versions_created_at ON evidence_versions(created_at);
     CREATE INDEX IF NOT EXISTS idx_evidence_versions_collaborator ON evidence_versions(collaborator_id);
     CREATE INDEX IF NOT EXISTS idx_evidence_versions_change_type ON evidence_versions(change_type);
+
+    CREATE TABLE IF NOT EXISTS case_snapshots (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      case_name TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      created_by TEXT NOT NULL,
+      created_by_name TEXT NOT NULL,
+      filter_state TEXT NOT NULL DEFAULT '{}',
+      canvas_layout TEXT NOT NULL DEFAULT '{}',
+      relationship_notes TEXT NOT NULL DEFAULT '[]',
+      evidence TEXT NOT NULL DEFAULT '[]',
+      connections TEXT NOT NULL DEFAULT '[]',
+      connection_groups TEXT NOT NULL DEFAULT '[]',
+      exported_format TEXT,
+      exported_content TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_case_snapshots_case_id ON case_snapshots(case_id);
+    CREATE INDEX IF NOT EXISTS idx_case_snapshots_created_at ON case_snapshots(created_at);
   `);
 };
 

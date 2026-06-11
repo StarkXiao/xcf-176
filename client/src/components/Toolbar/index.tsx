@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   FilePlus,
   Save,
@@ -22,6 +22,11 @@ import {
   CalendarDays,
   RotateCcw,
   Layers,
+  Camera,
+  X,
+  FileJson,
+  FileCode,
+  FileDown,
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -30,9 +35,12 @@ import { TemplateInfoBadge } from '@/components/TemplateInfo';
 import { useUiStore } from '@/store/useUiStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
+import { useCaseStore } from '@/store/useCaseStore';
 import { useZoom } from '@/hooks/useZoom';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
+import { createCaseSnapshot, exportCaseSnapshot } from '@/utils/exportUtils';
+import type { CaseSnapshotExportFormat } from '@/types';
 
 export const Toolbar: React.FC = () => {
   const { zoom, zoomIn, zoomOut, setZoomLevel, resetView } = useZoom();
@@ -54,6 +62,7 @@ export const Toolbar: React.FC = () => {
   const toggleAnomalyAlertPanel = useUiStore((state) => state.toggleAnomalyAlertPanel);
   const toggleReportPanel = useUiStore((state) => state.toggleReportPanel);
   const toggleConnectionGroupPanel = useUiStore((state) => state.toggleConnectionGroupPanel);
+  const currentCollaboratorId = useUiStore((state) => state.currentCollaboratorId);
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const propertyPanelOpen = useUiStore((state) => state.propertyPanelOpen);
   const collaboratorPanelOpen = useUiStore((state) => state.collaboratorPanelOpen);
@@ -69,10 +78,25 @@ export const Toolbar: React.FC = () => {
   const connectionGroupPanelOpen = useUiStore((state) => state.connectionGroupPanelOpen);
   const timelineMode = useCanvasStore((state) => state.timelineMode);
   const toggleTimelineMode = useCanvasStore((state) => state.toggleTimelineMode);
+  const canvasZoom = useCanvasStore((state) => state.zoom);
+  const canvasPanX = useCanvasStore((state) => state.panX);
+  const canvasPanY = useCanvasStore((state) => state.panY);
+  const connections = useCanvasStore((state) => state.connections);
+  const visibleConnectionIds = useCanvasStore((state) => state.visibleConnectionIds);
+  const hiddenConnectionIds = useCanvasStore((state) => state.hiddenConnectionIds);
+  const timeRangeFilter = useCanvasStore((state) => state.timeRangeFilter);
   const arrangeByTimeline = useEvidenceStore((state) => state.arrangeByTimeline);
   const restorePositions = useEvidenceStore((state) => state.restorePositions);
   const previousPositions = useEvidenceStore((state) => state.previousPositions);
+  const evidenceList = useEvidenceStore((state) => state.getEvidenceArray());
+  const searchFilters = useEvidenceStore((state) => state.searchFilters);
+  const getFilteredEvidence = useEvidenceStore((state) => state.getFilteredEvidence);
+  const currentCase = useCaseStore((state) => state.currentCase);
   const { forceSave } = useDebouncedSave();
+
+  const [snapshotMenuOpen, setSnapshotMenuOpen] = useState(false);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotStatus, setSnapshotStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(updateCurrentTime, 1000);
@@ -102,6 +126,52 @@ export const Toolbar: React.FC = () => {
       await restorePositions();
     }
     toggleTimelineMode();
+  };
+
+  const handleCreateAndExportSnapshot = async (format: CaseSnapshotExportFormat) => {
+    if (!currentCase) {
+      setSnapshotStatus('请先打开案件');
+      setTimeout(() => setSnapshotStatus(null), 3000);
+      return;
+    }
+
+    setSnapshotLoading(true);
+    setSnapshotMenuOpen(false);
+    try {
+      const filteredEvidence = getFilteredEvidence();
+      const matchedEvidenceIds = filteredEvidence.map((e) => e.id);
+
+      const snapshot = await createCaseSnapshot({
+        caseId: currentCase.id,
+        caseName: currentCase.name,
+        createdBy: currentCollaboratorId || 'system',
+        createdByName: '当前操作员',
+        filters: searchFilters,
+        matchedEvidenceIds,
+        evidence: evidenceList,
+        connections,
+        canvasZoom,
+        canvasPanX,
+        canvasPanY,
+        visibleConnectionIds,
+        hiddenConnectionIds,
+        timeRangeFilter,
+        timelineMode,
+      });
+
+      if (snapshot) {
+        await exportCaseSnapshot(snapshot.id, format);
+        setSnapshotStatus('快照导出成功');
+      } else {
+        setSnapshotStatus('创建快照失败');
+      }
+    } catch (error) {
+      console.error('Snapshot export error:', error);
+      setSnapshotStatus('快照导出失败');
+    } finally {
+      setSnapshotLoading(false);
+      setTimeout(() => setSnapshotStatus(null), 3000);
+    }
   };
 
   return (
@@ -215,6 +285,82 @@ export const Toolbar: React.FC = () => {
         >
           导出
         </NeonButton>
+
+        <div className="relative">
+          <NeonButton
+            size="sm"
+            variant="success"
+            icon={<Camera size={16} />}
+            onClick={() => setSnapshotMenuOpen(!snapshotMenuOpen)}
+            disabled={snapshotLoading}
+          >
+            {snapshotLoading ? '生成中...' : '快照'}
+          </NeonButton>
+
+          {snapshotMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setSnapshotMenuOpen(false)}
+              />
+              <div
+                className="absolute left-0 top-full mt-1 z-20 w-48 border rounded-sm py-1"
+                style={{
+                  backgroundColor: CYBERPUNK_COLORS.bgSecondary,
+                  borderColor: CYBERPUNK_COLORS.borderColor,
+                  boxShadow: `0 0 16px ${getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.2)}`,
+                }}
+              >
+                <button
+                  className="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 hover:bg-opacity-20 transition-colors"
+                  style={{
+                    color: CYBERPUNK_COLORS.textPrimary,
+                  }}
+                  onClick={() => handleCreateAndExportSnapshot('json')}
+                  disabled={snapshotLoading}
+                >
+                  <FileJson size={14} style={{ color: CYBERPUNK_COLORS.accentCyan }} />
+                  导出为 JSON
+                </button>
+                <button
+                  className="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 hover:bg-opacity-20 transition-colors"
+                  style={{
+                    color: CYBERPUNK_COLORS.textPrimary,
+                  }}
+                  onClick={() => handleCreateAndExportSnapshot('html')}
+                  disabled={snapshotLoading}
+                >
+                  <FileCode size={14} style={{ color: CYBERPUNK_COLORS.accentPurple }} />
+                  导出为 HTML
+                </button>
+                <button
+                  className="w-full px-3 py-2 text-left text-xs font-mono flex items-center gap-2 hover:bg-opacity-20 transition-colors"
+                  style={{
+                    color: CYBERPUNK_COLORS.textPrimary,
+                  }}
+                  onClick={() => handleCreateAndExportSnapshot('markdown')}
+                  disabled={snapshotLoading}
+                >
+                  <FileDown size={14} style={{ color: CYBERPUNK_COLORS.accentGreen }} />
+                  导出为 Markdown
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {snapshotStatus && (
+          <span
+            className="text-xs font-mono"
+            style={{
+              color: snapshotStatus.includes('成功')
+                ? CYBERPUNK_COLORS.accentGreen
+                : CYBERPUNK_COLORS.accentRed,
+            }}
+          >
+            {snapshotStatus}
+          </span>
+        )}
 
         <div
           className="h-6 w-px mx-2"

@@ -999,3 +999,81 @@ export interface CrossCaseComparisonResult {
   recommendations: string[];
   comparedAt: string;
 }
+
+export type CaseSnapshotExportFormat = 'json' | 'html' | 'markdown';
+
+export interface CaseSnapshotFilterState {
+  keyword: string;
+  tags: string[];
+  importance?: Evidence['importance'];
+  matchedEvidenceIds: string[];
+}
+
+export interface CaseSnapshotCanvasLayout {
+  zoom: number;
+  panX: number;
+  panY: number;
+  evidencePositions: Array<{
+    evidenceId: string;
+    positionX: number;
+    positionY: number;
+    width: number;
+    height: number;
+    color: string;
+  }>;
+  visibleConnectionIds: string[] | null;
+  hiddenConnectionIds: string[];
+  timeRangeFilter: {
+    start: string | null;
+    end: string | null;
+  };
+  timelineMode: boolean;
+}
+
+export interface CaseSnapshotRelationshipNote {
+  connectionId: string;
+  fromEvidenceId: string;
+  toEvidenceId: string;
+  fromEvidenceContent: string;
+  toEvidenceContent: string;
+  label: string;
+  color: string;
+  description: string;
+}
+
+export interface CaseSnapshot {
+  id: string;
+  caseId: string;
+  caseName: string;
+  title: string;
+  description?: string;
+  createdBy: string;
+  createdByName: string;
+  filterState: CaseSnapshotFilterState;
+  canvasLayout: CaseSnapshotCanvasLayout;
+  relationshipNotes: CaseSnapshotRelationshipNote[];
+  evidence: Evidence[];
+  connections: Connection[];
+  connectionGroups: ConnectionGroup[];
+  exportedFormat?: CaseSnapshotExportFormat;
+  exportedContent?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCaseSnapshotDto {
+  caseId: string;
+  title?: string;
+  description?: string;
+  createdBy: string;
+  createdByName: string;
+  filterState: CaseSnapshotFilterState;
+  canvasLayout: CaseSnapshotCanvasLayout;
+  relationshipNotes?: CaseSnapshotRelationshipNote[];
+}
+
+export interface UpdateCaseSnapshotDto {
+  title?: string;
+  description?: string;
+  relationshipNotes?: CaseSnapshotRelationshipNote[];
+}
