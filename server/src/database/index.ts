@@ -300,7 +300,7 @@ const createTables = () => {
       restored_from_version_id TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
-      FOREIGN KEY (evidence_id) REFERENCES evidence(id) ON DELETE CASCADE
+      FOREIGN KEY (evidence_id) REFERENCES evidence(id)
     );
 
     CREATE INDEX IF NOT EXISTS idx_evidence_versions_evidence_id ON evidence_versions(evidence_id);
@@ -337,6 +337,52 @@ const runMigrations = () => {
   }
   if (!caseColumnNames.includes('template_metadata')) {
     db.exec('ALTER TABLE cases ADD COLUMN template_metadata TEXT');
+  }
+
+  const evTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='evidence_versions'").get() as { name: string } | undefined;
+  if (evTableExists) {
+    const fkList = db.prepare("PRAGMA foreign_key_list(evidence_versions)").all() as Array<{ id: number; table: string; from: string; to: string; on_delete: string }>;
+    const evFk = fkList.find(fk => fk.from === 'evidence_id' && fk.table === 'evidence');
+    if (evFk && evFk.on_delete === 'CASCADE') {
+      db.pragma('foreign_keys = OFF');
+      const transaction = db.transaction(() => {
+        db.exec(`
+          CREATE TABLE evidence_versions_new (
+            id TEXT PRIMARY KEY,
+            evidence_id TEXT NOT NULL,
+            case_id TEXT NOT NULL,
+            version_number INTEGER NOT NULL DEFAULT 1,
+            change_type TEXT NOT NULL,
+            change_summary TEXT NOT NULL DEFAULT '',
+            field_diffs TEXT NOT NULL DEFAULT '[]',
+            tag_changes TEXT NOT NULL DEFAULT '[]',
+            relation_changes TEXT NOT NULL DEFAULT '[]',
+            before_state TEXT,
+            after_state TEXT,
+            related_connections_snapshot TEXT,
+            collaborator_id TEXT,
+            collaborator_name TEXT,
+            restored_from_version_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+            FOREIGN KEY (evidence_id) REFERENCES evidence(id)
+          );
+        `);
+        db.exec(`
+          INSERT INTO evidence_versions_new SELECT * FROM evidence_versions;
+        `);
+        db.exec('DROP TABLE evidence_versions;');
+        db.exec('ALTER TABLE evidence_versions_new RENAME TO evidence_versions;');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_evidence_id ON evidence_versions(evidence_id);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_case_id ON evidence_versions(case_id);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_version_number ON evidence_versions(evidence_id, version_number);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_created_at ON evidence_versions(created_at);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_collaborator ON evidence_versions(collaborator_id);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_change_type ON evidence_versions(change_type);');
+      });
+      transaction();
+      db.pragma('foreign_keys = ON');
+    }
   }
 };
 

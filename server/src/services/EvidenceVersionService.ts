@@ -480,12 +480,8 @@ export const EvidenceVersionService = {
 
     if (changeType === 'delete') {
       restoreState = beforeState;
-    } else if (changeType === 'create') {
-      restoreState = afterState;
-    } else if (changeType === 'restore') {
-      restoreState = afterState;
     } else {
-      restoreState = beforeState;
+      restoreState = afterState;
     }
 
     if (!restoreState) {
@@ -535,15 +531,16 @@ export const EvidenceVersionService = {
 
     const connectionChanges: RelationChange[] = [];
     if (targetVersion.relatedConnectionsSnapshot) {
-      const currentConnIds = new Set(connectionsBefore.map((c) => c.id));
+      const currentConnsMap = new Map(connectionsBefore.map((c) => [c.id, c]));
+      const snapshotConnsMap = new Map(targetVersion.relatedConnectionsSnapshot.map((c) => [c.id, c]));
       const snapshotConnIds = new Set(targetVersion.relatedConnectionsSnapshot.map((c) => c.id));
 
-      for (const sc of targetVersion.relatedConnectionsSnapshot) {
-        if (!currentConnIds.has(sc.id)) {
+      for (const [connId, sc] of snapshotConnsMap) {
+        if (!currentConnsMap.has(connId)) {
           const fromExists = EvidenceRepository.findById(sc.fromEvidenceId);
           const toExists = EvidenceRepository.findById(sc.toEvidenceId);
           if (fromExists && toExists) {
-            ConnectionRepository.createWithId(sc.id, {
+            ConnectionRepository.createWithId(connId, {
               caseId: sc.caseId,
               fromEvidenceId: sc.fromEvidenceId,
               toEvidenceId: sc.toEvidenceId,
@@ -553,7 +550,7 @@ export const EvidenceVersionService = {
             } as CreateConnectionDto);
             connectionChanges.push({
               type: 'add',
-              connectionId: sc.id,
+              connectionId: connId,
               fromEvidenceId: sc.fromEvidenceId,
               toEvidenceId: sc.toEvidenceId,
               newLabel: sc.label,
@@ -561,6 +558,43 @@ export const EvidenceVersionService = {
               newLineStyle: sc.lineStyle,
             });
           }
+        } else {
+          const cc = currentConnsMap.get(connId)!;
+          const hasChange = cc.label !== sc.label || cc.color !== sc.color || cc.lineStyle !== sc.lineStyle;
+          if (hasChange) {
+            ConnectionRepository.update(connId, {
+              label: sc.label,
+              color: sc.color,
+              lineStyle: sc.lineStyle,
+            });
+            connectionChanges.push({
+              type: 'update',
+              connectionId: connId,
+              fromEvidenceId: sc.fromEvidenceId,
+              toEvidenceId: sc.toEvidenceId,
+              oldLabel: cc.label,
+              newLabel: sc.label,
+              oldColor: cc.color,
+              newColor: sc.color,
+              oldLineStyle: cc.lineStyle,
+              newLineStyle: sc.lineStyle,
+            });
+          }
+        }
+      }
+
+      for (const [connId, cc] of currentConnsMap) {
+        if (!snapshotConnIds.has(connId)) {
+          connectionChanges.push({
+            type: 'remove',
+            connectionId: connId,
+            fromEvidenceId: cc.fromEvidenceId,
+            toEvidenceId: cc.toEvidenceId,
+            oldLabel: cc.label,
+            oldColor: cc.color,
+            oldLineStyle: cc.lineStyle,
+          });
+          ConnectionRepository.delete(connId);
         }
       }
     }
