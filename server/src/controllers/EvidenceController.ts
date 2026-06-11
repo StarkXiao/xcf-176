@@ -407,4 +407,40 @@ export const EvidenceController = {
       return reply.status(500).send(response);
     }
   },
+
+  async bulkUpdateEvidence(
+    req: FastifyRequest<{ Body: { updates: Array<{ id: string; data: UpdateEvidenceDto }>; collaboratorId?: string; collaboratorName?: string } }>,
+    reply: FastifyReply
+  ) {
+    try {
+      const { updates, collaboratorId, collaboratorName } = req.body;
+
+      if (!updates || !Array.isArray(updates) || updates.length === 0) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: '更新列表不能为空',
+        };
+        return reply.status(400).send(response);
+      }
+
+      const updated = EvidenceService.bulkUpdateEvidence(
+        updates,
+        collaboratorId ?? null,
+        collaboratorName ?? null
+      );
+
+      const response: ApiResponse<typeof updated> = {
+        success: true,
+        data: updated,
+        message: `批量更新了 ${updated.length} 条证据`,
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
 };

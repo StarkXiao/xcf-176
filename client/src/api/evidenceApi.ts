@@ -30,10 +30,14 @@ export const evidenceApi = {
     });
   },
 
-  async bulkUpdate(updates: Array<{ id: string; data: UpdateEvidenceDto }>): Promise<ApiResponse<Evidence[]>> {
+  async bulkUpdate(
+    updates: Array<{ id: string; data: UpdateEvidenceDto }>,
+    collaboratorId?: string,
+    collaboratorName?: string
+  ): Promise<ApiResponse<Evidence[]>> {
     return request<Evidence[]>('/evidence/bulk', {
       method: 'PUT',
-      body: JSON.stringify({ updates }),
+      body: JSON.stringify({ updates, collaboratorId, collaboratorName }),
     });
   },
 

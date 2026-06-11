@@ -24,7 +24,7 @@ interface EvidenceListItemProps {
   evidence: Evidence;
   onDragStart: (e: React.DragEvent, evidence: Evidence) => void;
   onDragEnd: () => void;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
   isSelected: boolean;
 }
 

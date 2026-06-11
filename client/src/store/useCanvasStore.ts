@@ -19,6 +19,7 @@ interface CanvasState {
   panX: number;
   panY: number;
   selectedId: string | null;
+  selectedIds: Set<string>;
   selectedConnectionId: string | null;
   connections: Connection[];
   drawingConnection: DrawingConnection | null;
@@ -29,6 +30,13 @@ interface CanvasState {
   setZoom: (zoom: number) => void;
   setPan: (x: number, y: number) => void;
   setSelectedId: (id: string | null) => void;
+  toggleSelectedId: (id: string, multiSelect?: boolean) => void;
+  setSelectedIds: (ids: Set<string>) => void;
+  addToSelection: (id: string) => void;
+  removeFromSelection: (id: string) => void;
+  clearSelection: () => void;
+  getSelectedCount: () => number;
+  isSelected: (id: string) => boolean;
   setSelectedConnectionId: (id: string | null) => void;
   setConnections: (connections: Connection[]) => void;
   addConnection: (connection: Connection) => void;
@@ -55,6 +63,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   panX: 0,
   panY: 0,
   selectedId: null,
+  selectedIds: new Set<string>(),
   selectedConnectionId: null,
   connections: [],
   drawingConnection: null,
@@ -70,9 +79,82 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   setPan: (x, y) => set({ panX: x, panY: y }),
 
-  setSelectedId: (id) => set({ selectedId: id, selectedConnectionId: null }),
+  setSelectedId: (id) => {
+    if (id === null) {
+      set({ selectedId: null, selectedIds: new Set(), selectedConnectionId: null });
+    } else {
+      set({ selectedId: id, selectedIds: new Set([id]), selectedConnectionId: null });
+    }
+  },
 
-  setSelectedConnectionId: (id) => set({ selectedConnectionId: id, selectedId: null }),
+  toggleSelectedId: (id, multiSelect = false) => {
+    const { selectedIds } = get();
+    const newSelectedIds = new Set(selectedIds);
+    if (multiSelect) {
+      if (newSelectedIds.has(id)) {
+        newSelectedIds.delete(id);
+      } else {
+        newSelectedIds.add(id);
+      }
+      set({
+        selectedIds: newSelectedIds,
+        selectedId: newSelectedIds.size === 1 ? id : (newSelectedIds.size > 1 ? null : get().selectedId),
+        selectedConnectionId: null,
+      });
+    } else {
+      set({
+        selectedIds: new Set([id]),
+        selectedId: id,
+        selectedConnectionId: null,
+      });
+    }
+  },
+
+  setSelectedIds: (ids) => {
+    const idsArray = Array.from(ids);
+    set({
+      selectedIds: ids,
+      selectedId: idsArray.length === 1 ? idsArray[0] : null,
+      selectedConnectionId: null,
+    });
+  },
+
+  addToSelection: (id) => {
+    const { selectedIds } = get();
+    const newSelectedIds = new Set(selectedIds);
+    newSelectedIds.add(id);
+    const idsArray = Array.from(newSelectedIds);
+    set({
+      selectedIds: newSelectedIds,
+      selectedId: idsArray.length === 1 ? id : get().selectedId,
+      selectedConnectionId: null,
+    });
+  },
+
+  removeFromSelection: (id) => {
+    const { selectedIds } = get();
+    const newSelectedIds = new Set(selectedIds);
+    newSelectedIds.delete(id);
+    const idsArray = Array.from(newSelectedIds);
+    set({
+      selectedIds: newSelectedIds,
+      selectedId: idsArray.length === 1 ? idsArray[0] : null,
+    });
+  },
+
+  clearSelection: () => {
+    set({
+      selectedId: null,
+      selectedIds: new Set(),
+      selectedConnectionId: null,
+    });
+  },
+
+  getSelectedCount: () => get().selectedIds.size,
+
+  isSelected: (id) => get().selectedIds.has(id),
+
+  setSelectedConnectionId: (id) => set({ selectedConnectionId: id, selectedId: null, selectedIds: new Set() }),
 
   setConnections: (connections) => set({ connections }),
 

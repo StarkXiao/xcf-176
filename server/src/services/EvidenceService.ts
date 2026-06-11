@@ -196,4 +196,47 @@ export const EvidenceService = {
     evidence.forEach((e) => e.tags.forEach((t: string) => tagSet.add(t)));
     return Array.from(tagSet).sort();
   },
+
+  bulkUpdateEvidence: (updates: Array<{ id: string; data: UpdateEvidenceDto }>, collaboratorId?: string | null, collaboratorName?: string | null): Evidence[] => {
+    const results: Evidence[] = [];
+    const caseIds = new Set<string>();
+
+    for (const update of updates) {
+      const { id, data } = update;
+      const existing = EvidenceRepository.findById(id);
+      const updated = EvidenceRepository.update(id, data);
+      if (updated && existing) {
+        try {
+          EvidenceVersionService.recordEvidenceUpdate(
+            id,
+            data,
+            existing,
+            updated,
+            collaboratorId ?? null,
+            collaboratorName ?? null
+          );
+        } catch (_e) {
+          // version logging should not break primary operation
+        }
+        const changes: SyncSourceChange[] = [];
+        if (data.importance !== undefined && data.importance !== existing.importance) {
+          changes.push({ field: 'importance', oldValue: existing.importance, newValue: data.importance });
+        }
+        if (data.status !== undefined && data.status !== existing.status) {
+          changes.push({ field: 'status', oldValue: existing.status, newValue: data.status });
+        }
+        if (changes.length > 0) {
+          InvestigationTaskService.onEvidenceUpdated(id, changes);
+        }
+        caseIds.add(updated.caseId);
+        results.push(updated);
+      }
+    }
+
+    for (const caseId of caseIds) {
+      AnomalyAlertService.runDetectionForCase(caseId);
+    }
+
+    return results;
+  },
 };

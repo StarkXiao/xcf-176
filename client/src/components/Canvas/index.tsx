@@ -40,7 +40,8 @@ export const Canvas: React.FC = () => {
 
   const evidence = useEvidenceStore((state) => state.getEvidenceArray());
   const selectedId = useCanvasStore((state) => state.selectedId);
-  const setSelectedId = useCanvasStore((state) => state.setSelectedId);
+  const selectedIds = useCanvasStore((state) => state.selectedIds);
+  const toggleSelectedId = useCanvasStore((state) => state.toggleSelectedId);
   const drawingConnection = useCanvasStore((state) => state.drawingConnection);
   const updateDrawingConnection = useCanvasStore((state) => state.updateDrawingConnection);
   const endDrawingConnection = useCanvasStore((state) => state.endDrawingConnection);
@@ -192,9 +193,10 @@ export const Canvas: React.FC = () => {
   const handleCardClick = useCallback(
     (e: React.MouseEvent, evidenceId: string) => {
       e.stopPropagation();
-      setSelectedId(selectedId === evidenceId ? null : evidenceId);
+      const multiSelect = e.ctrlKey || e.metaKey;
+      toggleSelectedId(evidenceId, multiSelect);
     },
-    [selectedId, setSelectedId]
+    [toggleSelectedId]
   );
 
   const canvasStyle: React.CSSProperties = {
@@ -231,6 +233,7 @@ export const Canvas: React.FC = () => {
         {visibleEvidence.map((item) => {
           const dimmed = dimmedEvidenceIds.has(item.id);
           const highlighted = isHighlighted(item.id);
+          const isCardSelected = selectedIds.has(item.id);
 
           return (
             <div
@@ -249,7 +252,7 @@ export const Canvas: React.FC = () => {
             >
               <EvidenceCard
                 evidence={item}
-                isSelected={highlighted || selectedId === item.id}
+                isSelected={highlighted || isCardSelected}
                 onMouseDown={(e) => handleCardMouseDown(e, item)}
                 onClick={(e) => handleCardClick(e, item.id)}
                 onConnectionStart={handleConnectionStart}

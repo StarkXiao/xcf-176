@@ -26,7 +26,7 @@ interface EvidenceState {
   deleteEvidence: (id: string) => Promise<void>;
   setEvidence: (evidenceList: Evidence[]) => void;
   updateEvidencePosition: (id: string, x: number, y: number) => void;
-  bulkUpdateEvidence: (updates: Array<{ id: string; data: UpdateEvidenceDto }>) => Promise<void>;
+  bulkUpdateEvidence: (updates: Array<{ id: string; data: UpdateEvidenceDto }>, collaboratorId?: string, collaboratorName?: string) => Promise<void>;
   arrangeByTimeline: (config?: TimelineLayoutConfig) => Promise<void>;
   restorePositions: () => Promise<void>;
 }
@@ -128,10 +128,10 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
     }
   },
 
-  bulkUpdateEvidence: async (updates) => {
+  bulkUpdateEvidence: async (updates, collaboratorId?: string, collaboratorName?: string) => {
     set({ loading: true, error: null });
     try {
-      const response = await evidenceApi.bulkUpdate(updates);
+      const response = await evidenceApi.bulkUpdate(updates, collaboratorId, collaboratorName);
       if (response.success && response.data) {
         const evidenceMap: Record<string, Evidence> = { ...get().evidence };
         response.data.forEach((e) => {

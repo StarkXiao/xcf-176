@@ -8,6 +8,7 @@ export const evidenceRoutes = async (fastify: FastifyInstance) => {
   fastify.post('/case/:caseId/search', EvidenceController.searchEvidence);
   fastify.get('/case/:caseId/tags', EvidenceController.getTags);
   fastify.post('/', EvidenceController.createEvidence);
+  fastify.put('/bulk', EvidenceController.bulkUpdateEvidence);
   fastify.put('/:id', EvidenceController.updateEvidence);
   fastify.put('/:id/position', EvidenceController.updatePosition);
   fastify.put('/:id/size', EvidenceController.updateSize);

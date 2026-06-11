@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Settings, X } from 'lucide-react';
 import { EvidenceEditor } from './EvidenceEditor';
 import { ConnectionEditor } from './ConnectionEditor';
+import { BulkEvidenceEditor } from './BulkEvidenceEditor';
 import { useUiStore } from '@/store/useUiStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
@@ -11,10 +12,13 @@ export const PropertyPanel: React.FC = () => {
   const propertyPanelOpen = useUiStore((state) => state.propertyPanelOpen);
   const togglePropertyPanel = useUiStore((state) => state.togglePropertyPanel);
   const selectedId = useCanvasStore((state) => state.selectedId);
+  const selectedIds = useCanvasStore((state) => state.selectedIds);
   const selectedConnectionId = useCanvasStore((state) => state.selectedConnectionId);
   const connections = useCanvasStore((state) => state.connections);
   const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
 
+  const selectedEvidenceIds = useMemo(() => Array.from(selectedIds), [selectedIds]);
+  const isMultiSelect = selectedIds.size > 1;
   const selectedEvidence = selectedId ? getEvidenceById(selectedId) : null;
   const selectedConnection = selectedConnectionId
     ? connections.find((c) => c.id === selectedConnectionId) ?? null
@@ -78,7 +82,9 @@ export const PropertyPanel: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {selectedEvidence ? (
+        {isMultiSelect ? (
+          <BulkEvidenceEditor evidenceIds={selectedEvidenceIds} />
+        ) : selectedEvidence ? (
           <EvidenceEditor evidence={selectedEvidence} />
         ) : selectedConnection ? (
           <ConnectionEditor connection={selectedConnection} />
@@ -94,6 +100,9 @@ export const PropertyPanel: React.FC = () => {
             />
             <p>选择证据卡片或关联线</p>
             <p className="text-xs mt-2">以编辑其属性</p>
+            <p className="text-xs mt-4" style={{ color: CYBERPUNK_COLORS.accentCyan }}>
+              提示：按住 Ctrl/Cmd 点击可多选证据
+            </p>
           </div>
         )}
       </div>

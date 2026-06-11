@@ -13,8 +13,8 @@ import type { Evidence, SearchFilters } from '@/types';
 export const Sidebar: React.FC = () => {
   const currentCase = useCaseStore((state) => state.currentCase);
   const evidenceList = useEvidenceStore((state) => state.getEvidenceArray());
-  const selectedId = useCanvasStore((state) => state.selectedId);
-  const setSelectedId = useCanvasStore((state) => state.setSelectedId);
+  const selectedIds = useCanvasStore((state) => state.selectedIds);
+  const toggleSelectedId = useCanvasStore((state) => state.toggleSelectedId);
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const [filters, setFilters] = useState<SearchFilters>({
     keyword: '',
@@ -52,8 +52,9 @@ export const Sidebar: React.FC = () => {
 
   const handleDragEnd = () => {};
 
-  const handleItemClick = (evidence: Evidence) => {
-    setSelectedId(selectedId === evidence.id ? null : evidence.id);
+  const handleItemClick = (e: React.MouseEvent, evidence: Evidence) => {
+    const multiSelect = e.ctrlKey || e.metaKey || e.shiftKey;
+    toggleSelectedId(evidence.id, multiSelect);
   };
 
   const handleAddEvidence = async () => {
@@ -154,8 +155,8 @@ export const Sidebar: React.FC = () => {
               evidence={evidence}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-              onClick={() => handleItemClick(evidence)}
-              isSelected={selectedId === evidence.id}
+              onClick={(e) => handleItemClick(e, evidence)}
+              isSelected={selectedIds.has(evidence.id)}
             />
           ))
         )}
