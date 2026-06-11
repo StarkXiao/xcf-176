@@ -213,7 +213,7 @@ export const CaseSelector: React.FC = () => {
                               >
                                 {caseItem.name}
                               </h3>
-                              {priority && priority.alerts.length > 0 && (
+                              {priority && priority.alerts.filter((a) => a.status === 'pending').length > 0 && (
                                 <button
                                   className="flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded-sm flex-shrink-0 transition-all hover:opacity-80"
                                   style={{
@@ -225,10 +225,10 @@ export const CaseSelector: React.FC = () => {
                                     e.stopPropagation();
                                     await handleSelectPriorityCase(caseItem);
                                   }}
-                                  title={`${priority.alerts.length} 个预警，点击查看`}
+                                  title={`${priority.alerts.filter((a) => a.status === 'pending').length} 个待处理预警，点击查看`}
                                 >
                                   <AlertTriangle size={10} />
-                                  {priority.alerts.length}
+                                  {priority.alerts.filter((a) => a.status === 'pending').length}
                                 </button>
                               )}
                             </div>

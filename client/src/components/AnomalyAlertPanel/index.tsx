@@ -325,7 +325,7 @@ function PriorityCaseCard({
         className="text-xs font-mono mt-1"
         style={{ color: CYBERPUNK_COLORS.textSecondary }}
       >
-        {result.alerts.length} 个预警
+        {result.alerts.filter((a) => a.status === 'pending').length} 个待处理预警
       </div>
     </div>
   );

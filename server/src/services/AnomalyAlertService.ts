@@ -558,6 +558,9 @@ export const AnomalyAlertService = {
 
   getPriorityCases: (config?: AnomalyDetectionConfig): AnomalyDetectionResult[] => {
     const results = AnomalyAlertService.runDetectionForAllCases(config);
-    return results.filter((r) => r.overallScore >= 0.3 || r.alerts.length > 0);
+    return results.filter((r) => {
+      const pendingAlerts = r.alerts.filter((a) => a.status === 'pending');
+      return r.overallScore >= 0.3 || pendingAlerts.length > 0;
+    });
   },
 };
