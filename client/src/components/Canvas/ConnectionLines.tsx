@@ -20,7 +20,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
 }) => {
   const connections = useCanvasStore((state) => state.connections);
   const selectedConnectionId = useCanvasStore((state) => state.selectedConnectionId);
-  const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
+  const evidence = useEvidenceStore((state) => state.evidence);
   const removeConnection = useCanvasStore((state) => state.removeConnection);
   const setSelectedConnectionId = useCanvasStore((state) => state.setSelectedConnectionId);
   const setSelectedId = useCanvasStore((state) => state.setSelectedId);
@@ -51,8 +51,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
     if (!conn) return;
 
     const snapshot = captureConnectionSnapshot(conn);
-    const fromEv = getEvidenceById(conn.fromEvidenceId);
-    const toEv = getEvidenceById(conn.toEvidenceId);
+    const fromEv = evidence[conn.fromEvidenceId];
+    const toEv = evidence[conn.toEvidenceId];
     const fromLabel = fromEv ? fromEv.content.slice(0, 15) : '?';
     const toLabel = toEv ? toEv.content.slice(0, 15) : '?';
 
@@ -90,8 +90,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
       </defs>
 
       {connections.map((connection) => {
-        const fromEvidence = getEvidenceById(connection.fromEvidenceId);
-        const toEvidence = getEvidenceById(connection.toEvidenceId);
+        const fromEvidence = evidence[connection.fromEvidenceId];
+        const toEvidence = evidence[connection.toEvidenceId];
 
         if (!fromEvidence || !toEvidence) return null;
 

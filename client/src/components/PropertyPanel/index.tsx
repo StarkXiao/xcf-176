@@ -15,11 +15,11 @@ export const PropertyPanel: React.FC = () => {
   const selectedIds = useCanvasStore((state) => state.selectedIds);
   const selectedConnectionId = useCanvasStore((state) => state.selectedConnectionId);
   const connections = useCanvasStore((state) => state.connections);
-  const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
+  const evidence = useEvidenceStore((state) => state.evidence);
 
   const selectedEvidenceIds = useMemo(() => Array.from(selectedIds), [selectedIds]);
   const isMultiSelect = selectedIds.size > 1;
-  const selectedEvidence = selectedId ? getEvidenceById(selectedId) : null;
+  const selectedEvidence = selectedId ? evidence[selectedId] : null;
   const selectedConnection = selectedConnectionId
     ? connections.find((c) => c.id === selectedConnectionId) ?? null
     : null;

@@ -27,7 +27,7 @@ const importanceOptions: Array<{ value: ImportanceLevel; label: string }> = [
 
 export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidenceIds }) => {
   const bulkUpdateEvidence = useEvidenceStore((state) => state.bulkUpdateEvidence);
-  const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
+  const evidence = useEvidenceStore((state) => state.evidence);
   const clearSelection = useCanvasStore((state) => state.clearSelection);
   const currentCollaboratorId = useUiStore((state) => state.currentCollaboratorId);
   const collaborators = useCollaboratorStore((state) => state.collaborators);
@@ -37,9 +37,9 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
 
   const selectedEvidence = useMemo(() => {
     return evidenceIds
-      .map((id) => getEvidenceById(id))
+      .map((id) => evidence[id])
       .filter((e): e is Evidence => e !== undefined);
-  }, [evidenceIds, getEvidenceById]);
+  }, [evidenceIds, evidence]);
 
   const [sourceChangeType, setSourceChangeType] = useState<FieldChangeType>('none');
   const [sourceValue, setSourceValue] = useState('');
