@@ -44,8 +44,13 @@ const createTables = () => {
       assigned_to TEXT DEFAULT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      deleted_at TEXT,
+      deleted_by TEXT,
+      deleted_by_name TEXT,
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
     );
+
+    CREATE INDEX IF NOT EXISTS idx_evidence_deleted_at ON evidence(deleted_at);
 
     CREATE TABLE IF NOT EXISTS connections (
       id TEXT PRIMARY KEY,
@@ -55,11 +60,34 @@ const createTables = () => {
       label TEXT,
       color TEXT DEFAULT '#6b7280',
       line_style TEXT NOT NULL DEFAULT 'solid',
+      relation_type_id TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      archived_at TEXT,
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
-      FOREIGN KEY (from_evidence_id) REFERENCES evidence(id) ON DELETE CASCADE,
-      FOREIGN KEY (to_evidence_id) REFERENCES evidence(id) ON DELETE CASCADE
+      FOREIGN KEY (from_evidence_id) REFERENCES evidence(id),
+      FOREIGN KEY (to_evidence_id) REFERENCES evidence(id)
     );
+
+    CREATE TABLE IF NOT EXISTS connection_groups (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#6b7280',
+      line_style TEXT NOT NULL DEFAULT 'solid',
+      relation_type_id TEXT,
+      connection_ids TEXT NOT NULL DEFAULT '[]',
+      visible INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_connections_archived_at ON connections(archived_at);
+    CREATE INDEX IF NOT EXISTS idx_connections_relation_type ON connections(relation_type_id);
+    CREATE INDEX IF NOT EXISTS idx_connections_case_label ON connections(case_id, label);
+
+    CREATE INDEX IF NOT EXISTS idx_connection_groups_case_id ON connection_groups(case_id);
+    CREATE INDEX IF NOT EXISTS idx_connection_groups_relation_type ON connection_groups(relation_type_id);
 
     CREATE TABLE IF NOT EXISTS collaborators (
       id TEXT PRIMARY KEY,
@@ -275,6 +303,58 @@ const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_status ON anomaly_alerts(status);
     CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_type ON anomaly_alerts(type);
     CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_detected_at ON anomaly_alerts(detected_at);
+
+    CREATE TABLE IF NOT EXISTS evidence_versions (
+      id TEXT PRIMARY KEY,
+      evidence_id TEXT NOT NULL,
+      case_id TEXT NOT NULL,
+      version_number INTEGER NOT NULL DEFAULT 1,
+      change_type TEXT NOT NULL,
+      change_summary TEXT NOT NULL DEFAULT '',
+      field_diffs TEXT NOT NULL DEFAULT '[]',
+      tag_changes TEXT NOT NULL DEFAULT '[]',
+      relation_changes TEXT NOT NULL DEFAULT '[]',
+      before_state TEXT,
+      after_state TEXT,
+      related_connections_snapshot TEXT,
+      collaborator_id TEXT,
+      collaborator_name TEXT,
+      restored_from_version_id TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+      FOREIGN KEY (evidence_id) REFERENCES evidence(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_evidence_id ON evidence_versions(evidence_id);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_case_id ON evidence_versions(case_id);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_version_number ON evidence_versions(evidence_id, version_number);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_created_at ON evidence_versions(created_at);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_collaborator ON evidence_versions(collaborator_id);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_change_type ON evidence_versions(change_type);
+
+    CREATE TABLE IF NOT EXISTS case_snapshots (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      case_name TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      created_by TEXT NOT NULL,
+      created_by_name TEXT NOT NULL,
+      filter_state TEXT NOT NULL DEFAULT '{}',
+      canvas_layout TEXT NOT NULL DEFAULT '{}',
+      relationship_notes TEXT NOT NULL DEFAULT '[]',
+      evidence TEXT NOT NULL DEFAULT '[]',
+      connections TEXT NOT NULL DEFAULT '[]',
+      connection_groups TEXT NOT NULL DEFAULT '[]',
+      exported_format TEXT,
+      exported_content TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_case_snapshots_case_id ON case_snapshots(case_id);
+    CREATE INDEX IF NOT EXISTS idx_case_snapshots_created_at ON case_snapshots(created_at);
   `);
 };
 const runMigrations = () => {
@@ -299,6 +379,128 @@ const runMigrations = () => {
     }
     if (!caseColumnNames.includes('template_metadata')) {
         db.exec('ALTER TABLE cases ADD COLUMN template_metadata TEXT');
+    }
+    const evTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='evidence_versions'").get();
+    if (evTableExists) {
+        const fkList = db.prepare("PRAGMA foreign_key_list(evidence_versions)").all();
+        const evFk = fkList.find(fk => fk.from === 'evidence_id' && fk.table === 'evidence');
+        if (evFk && evFk.on_delete === 'CASCADE') {
+            db.pragma('foreign_keys = OFF');
+            const transaction = db.transaction(() => {
+                db.exec(`
+          CREATE TABLE evidence_versions_new (
+            id TEXT PRIMARY KEY,
+            evidence_id TEXT NOT NULL,
+            case_id TEXT NOT NULL,
+            version_number INTEGER NOT NULL DEFAULT 1,
+            change_type TEXT NOT NULL,
+            change_summary TEXT NOT NULL DEFAULT '',
+            field_diffs TEXT NOT NULL DEFAULT '[]',
+            tag_changes TEXT NOT NULL DEFAULT '[]',
+            relation_changes TEXT NOT NULL DEFAULT '[]',
+            before_state TEXT,
+            after_state TEXT,
+            related_connections_snapshot TEXT,
+            collaborator_id TEXT,
+            collaborator_name TEXT,
+            restored_from_version_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+            FOREIGN KEY (evidence_id) REFERENCES evidence(id)
+          );
+        `);
+                db.exec(`
+          INSERT INTO evidence_versions_new SELECT * FROM evidence_versions;
+        `);
+                db.exec('DROP TABLE evidence_versions;');
+                db.exec('ALTER TABLE evidence_versions_new RENAME TO evidence_versions;');
+                db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_evidence_id ON evidence_versions(evidence_id);');
+                db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_case_id ON evidence_versions(case_id);');
+                db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_version_number ON evidence_versions(evidence_id, version_number);');
+                db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_created_at ON evidence_versions(created_at);');
+                db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_collaborator ON evidence_versions(collaborator_id);');
+                db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_versions_change_type ON evidence_versions(change_type);');
+            });
+            transaction();
+            db.pragma('foreign_keys = ON');
+        }
+    }
+    const evColumns = db.prepare("PRAGMA table_info(evidence)").all();
+    const evColumnNames = evColumns.map(c => c.name);
+    if (!evColumnNames.includes('deleted_at')) {
+        db.exec('ALTER TABLE evidence ADD COLUMN deleted_at TEXT');
+    }
+    if (!evColumnNames.includes('deleted_by')) {
+        db.exec('ALTER TABLE evidence ADD COLUMN deleted_by TEXT');
+    }
+    if (!evColumnNames.includes('deleted_by_name')) {
+        db.exec('ALTER TABLE evidence ADD COLUMN deleted_by_name TEXT');
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_deleted_at ON evidence(deleted_at);');
+    const connColumns = db.prepare("PRAGMA table_info(connections)").all();
+    const connColumnNames = connColumns.map(c => c.name);
+    if (!connColumnNames.includes('archived_at')) {
+        db.exec('ALTER TABLE connections ADD COLUMN archived_at TEXT');
+    }
+    if (!connColumnNames.includes('relation_type_id')) {
+        db.exec('ALTER TABLE connections ADD COLUMN relation_type_id TEXT');
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_connections_archived_at ON connections(archived_at);');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_connections_relation_type ON connections(relation_type_id);');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_connections_case_label ON connections(case_id, label);');
+    const connGroupsTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='connection_groups'").get();
+    if (!connGroupsTableExists) {
+        db.exec(`
+      CREATE TABLE connection_groups (
+        id TEXT PRIMARY KEY,
+        case_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT '#6b7280',
+        line_style TEXT NOT NULL DEFAULT 'solid',
+        relation_type_id TEXT,
+        connection_ids TEXT NOT NULL DEFAULT '[]',
+        visible INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+      );
+    `);
+        db.exec('CREATE INDEX IF NOT EXISTS idx_connection_groups_case_id ON connection_groups(case_id);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_connection_groups_relation_type ON connection_groups(relation_type_id);');
+    }
+    const connFkList = db.prepare("PRAGMA foreign_key_list(connections)").all();
+    const fromFk = connFkList.find(fk => fk.from === 'from_evidence_id');
+    const toFk = connFkList.find(fk => fk.from === 'to_evidence_id');
+    const connNeedRebuild = (fromFk && fromFk.on_delete === 'CASCADE') || (toFk && toFk.on_delete === 'CASCADE');
+    if (connNeedRebuild) {
+        db.pragma('foreign_keys = OFF');
+        const transaction = db.transaction(() => {
+            db.exec(`
+        CREATE TABLE connections_new (
+          id TEXT PRIMARY KEY,
+          case_id TEXT NOT NULL,
+          from_evidence_id TEXT NOT NULL,
+          to_evidence_id TEXT NOT NULL,
+          label TEXT,
+          color TEXT DEFAULT '#6b7280',
+          line_style TEXT NOT NULL DEFAULT 'solid',
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          archived_at TEXT,
+          FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+          FOREIGN KEY (from_evidence_id) REFERENCES evidence(id),
+          FOREIGN KEY (to_evidence_id) REFERENCES evidence(id)
+        );
+      `);
+            db.exec(`INSERT INTO connections_new (id, case_id, from_evidence_id, to_evidence_id, label, color, line_style, created_at, archived_at) SELECT id, case_id, from_evidence_id, to_evidence_id, label, color, line_style, created_at, archived_at FROM connections;`);
+            db.exec('DROP TABLE connections;');
+            db.exec('ALTER TABLE connections_new RENAME TO connections;');
+            db.exec('CREATE INDEX IF NOT EXISTS idx_connections_case_id ON connections(case_id);');
+            db.exec('CREATE INDEX IF NOT EXISTS idx_connections_from ON connections(from_evidence_id);');
+            db.exec('CREATE INDEX IF NOT EXISTS idx_connections_to ON connections(to_evidence_id);');
+            db.exec('CREATE INDEX IF NOT EXISTS idx_connections_archived_at ON connections(archived_at);');
+        });
+        transaction();
+        db.pragma('foreign_keys = ON');
     }
 };
 const seedData = () => {

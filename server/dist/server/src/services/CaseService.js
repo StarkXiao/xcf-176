@@ -41,4 +41,16 @@ export const CaseService = {
         AnomalyAlertRepository.deleteByCaseId(id);
         return CaseRepository.delete(id);
     },
+    searchCases: (filters) => {
+        return CaseRepository.search(filters);
+    },
+    getAllCasesWithAggregatedData: () => {
+        return CaseRepository.findAllWithAggregatedData();
+    },
+    getAvailableCaseTags: () => {
+        return CaseRepository.getAllAvailableTags();
+    },
+    getAvailableCaseSources: () => {
+        return CaseRepository.getAllAvailableSources();
+    },
 };

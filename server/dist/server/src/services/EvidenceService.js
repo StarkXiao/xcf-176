@@ -1,7 +1,9 @@
 import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
+import { EvidenceVersionRepository } from '../repositories/EvidenceVersionRepository.js';
 import { InvestigationTaskService } from './InvestigationTaskService.js';
 import { AnomalyAlertService } from './AnomalyAlertService.js';
+import { EvidenceVersionService } from './EvidenceVersionService.js';
 export const EvidenceService = {
     getAllEvidence: () => {
         return EvidenceRepository.findAll();
@@ -37,15 +39,27 @@ export const EvidenceService = {
         }
         return evidence;
     },
-    createEvidence: (dto) => {
+    createEvidence: (dto, collaboratorId, collaboratorName) => {
         const evidence = EvidenceRepository.create(dto);
+        try {
+            EvidenceVersionService.recordEvidenceCreate(evidence, collaboratorId ?? null, collaboratorName ?? null);
+        }
+        catch (_e) {
+            // version logging should not break primary operation
+        }
         AnomalyAlertService.runDetectionForCase(dto.caseId);
         return evidence;
     },
-    updateEvidence: (id, dto) => {
+    updateEvidence: (id, dto, collaboratorId, collaboratorName) => {
         const existing = EvidenceRepository.findById(id);
         const updated = EvidenceRepository.update(id, dto);
         if (updated && existing) {
+            try {
+                EvidenceVersionService.recordEvidenceUpdate(id, dto, existing, updated, collaboratorId ?? null, collaboratorName ?? null);
+            }
+            catch (_e) {
+                // version logging should not break primary operation
+            }
             const changes = [];
             if (dto.content !== undefined && dto.content !== existing.content) {
                 changes.push({ field: 'content', oldValue: existing.content.slice(0, 20), newValue: dto.content.slice(0, 20) });
@@ -63,20 +77,117 @@ export const EvidenceService = {
         }
         return updated;
     },
-    deleteEvidence: (id) => {
+    deleteEvidence: (id, collaboratorId, collaboratorName) => {
         const existing = EvidenceRepository.findById(id);
         const caseId = existing?.caseId;
-        ConnectionRepository.deleteByEvidenceId(id);
-        const deleted = EvidenceRepository.delete(id);
+        let deleted = false;
+        if (existing) {
+            try {
+                EvidenceVersionService.recordEvidenceDelete(existing, collaboratorId ?? null, collaboratorName ?? null);
+            }
+            catch (_e) {
+                // version logging should not break primary operation
+            }
+            deleted = EvidenceRepository.softDelete(id, collaboratorId ?? null, collaboratorName ?? null);
+            if (deleted) {
+                ConnectionRepository.archiveByEvidenceId(id);
+            }
+        }
         if (deleted && caseId) {
             AnomalyAlertService.runDetectionForCase(caseId);
         }
         return deleted;
+    },
+    restoreDeletedEvidence: (id, collaboratorId, collaboratorName) => {
+        const deletedInfo = EvidenceRepository.findDeletedById(id);
+        if (!deletedInfo)
+            return { evidence: null, skippedConnections: [] };
+        const restored = EvidenceRepository.restore(id);
+        let skippedConnections = [];
+        if (restored) {
+            const connResult = ConnectionRepository.restoreByEvidenceId(id);
+            skippedConnections = connResult.skipped;
+            try {
+                EvidenceVersionService._recordRestoreFromDelete(restored, deletedInfo, collaboratorId ?? null, collaboratorName ?? null, connResult);
+            }
+            catch (_e) {
+                // version logging should not break primary operation
+            }
+            AnomalyAlertService.runDetectionForCase(restored.caseId);
+        }
+        return { evidence: restored, skippedConnections };
+    },
+    purgeDeletedEvidence: (id) => {
+        const deletedInfo = EvidenceRepository.findDeletedById(id);
+        if (!deletedInfo)
+            return false;
+        ConnectionRepository.deleteByEvidenceId(id);
+        EvidenceVersionRepository.deleteByEvidenceId(id);
+        return EvidenceRepository.delete(id);
+    },
+    purgeAllDeleted: (days) => {
+        let count = 0;
+        const toPurge = days !== undefined
+            ? EvidenceRepository.findAllDeleted().filter(d => {
+                const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+                return new Date(d.deletedAt).getTime() < cutoff;
+            })
+            : EvidenceRepository.findAllDeleted();
+        for (const d of toPurge) {
+            ConnectionRepository.deleteByEvidenceId(d.id);
+            EvidenceVersionRepository.deleteByEvidenceId(d.id);
+            if (EvidenceRepository.delete(d.id)) {
+                count++;
+            }
+        }
+        return { purgedEvidenceCount: count };
+    },
+    getAllDeletedEvidence: () => {
+        return EvidenceRepository.findAllDeleted();
+    },
+    getDeletedEvidenceByCaseId: (caseId) => {
+        return EvidenceRepository.findDeletedByCaseId(caseId);
+    },
+    getDeletedEvidenceById: (id) => {
+        return EvidenceRepository.findDeletedById(id);
     },
     getAllTags: (caseId) => {
         const evidence = EvidenceRepository.findByCaseId(caseId);
         const tagSet = new Set();
         evidence.forEach((e) => e.tags.forEach((t) => tagSet.add(t)));
         return Array.from(tagSet).sort();
+    },
+    bulkUpdateEvidence: (updates, collaboratorId, collaboratorName) => {
+        const results = [];
+        const caseIds = new Set();
+        for (const update of updates) {
+            const { id, data } = update;
+            const existing = EvidenceRepository.findById(id);
+            const updated = EvidenceRepository.update(id, data);
+            if (updated && existing) {
+                try {
+                    EvidenceVersionService.recordEvidenceUpdate(id, data, existing, updated, collaboratorId ?? null, collaboratorName ?? null);
+                }
+                catch (_e) {
+                    // version logging should not break primary operation
+                }
+                const changes = [];
+                if (data.importance !== undefined && data.importance !== existing.importance) {
+                    changes.push({ field: 'importance', oldValue: existing.importance, newValue: data.importance });
+                }
+                if (data.status !== undefined && data.status !== existing.status) {
+                    changes.push({ field: 'status', oldValue: existing.status, newValue: data.status });
+                }
+                if (changes.length > 0) {
+                    InvestigationTaskService.onEvidenceUpdated(id, changes);
+                }
+                caseIds.add(updated.caseId);
+                results.push(updated);
+            }
+        }
+        for (const caseId of caseIds) {
+            AnomalyAlertService.runDetectionForCase(caseId);
+        }
+        return results;
     },
 };

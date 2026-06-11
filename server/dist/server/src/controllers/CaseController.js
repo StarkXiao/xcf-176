@@ -18,6 +18,59 @@ export const CaseController = {
             return reply.status(500).send(response);
         }
     },
+    async getAllCasesWithMeta(_req, reply) {
+        try {
+            const cases = CaseService.getAllCasesWithAggregatedData();
+            const response = {
+                success: true,
+                data: cases,
+            };
+            return reply.send(response);
+        }
+        catch (error) {
+            const response = {
+                success: false,
+                error: error.message,
+            };
+            return reply.status(500).send(response);
+        }
+    },
+    async searchCases(req, reply) {
+        try {
+            const filters = req.body || { keyword: '', tags: [], sources: [] };
+            const cases = CaseService.searchCases(filters);
+            const response = {
+                success: true,
+                data: cases,
+            };
+            return reply.send(response);
+        }
+        catch (error) {
+            const response = {
+                success: false,
+                error: error.message,
+            };
+            return reply.status(500).send(response);
+        }
+    },
+    async getCaseFilterOptions(_req, reply) {
+        try {
+            const tags = CaseService.getAvailableCaseTags();
+            const sources = CaseService.getAvailableCaseSources();
+            const response = {
+                success: true,
+                data: { tags, sources },
+            };
+            return reply.send(response);
+        }
+        catch (error) {
+            const response = {
+                success: false,
+                error: error.message,
+            };
+            return reply.status(500).send(response);
+        }
+    },
     async getCaseById(req, reply) {
         try {
             const { id } = req.params;

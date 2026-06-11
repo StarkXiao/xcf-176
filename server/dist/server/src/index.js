@@ -13,6 +13,10 @@ import { reportRoutes } from './routes/reportRoutes.js';
 import { caseTemplateRoutes } from './routes/caseTemplateRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { anomalyAlertRoutes } from './routes/anomalyAlertRoutes.js';
+import { evidenceVersionRoutes } from './routes/evidenceVersionRoutes.js';
+import { crossCaseComparisonRoutes } from './routes/crossCaseComparisonRoutes.js';
+import { connectionGroupRoutes } from './routes/connectionGroupRoutes.js';
+import { caseSnapshotRoutes } from './routes/caseSnapshotRoutes.js';
 import { PersistenceService } from './services/PersistenceService.js';
 const server = fastify({
     logger: {
@@ -33,6 +37,10 @@ server.register(investigationTaskRoutes, { prefix: '/api/investigation-tasks' })
 server.register(reportRoutes, { prefix: '/api/reports' });
 server.register(caseTemplateRoutes, { prefix: '/api/case-templates' });
 server.register(anomalyAlertRoutes, { prefix: '/api/anomaly-alerts' });
+server.register(evidenceVersionRoutes, { prefix: '/api/evidence-versions' });
+server.register(crossCaseComparisonRoutes, { prefix: '/api/cross-case-comparison' });
+server.register(connectionGroupRoutes, { prefix: '/api/connection-groups' });
+server.register(caseSnapshotRoutes, { prefix: '/api/case-snapshots' });
 const start = async () => {
     try {
         await server.listen({ host: '0.0.0.0', port: 3001 });
