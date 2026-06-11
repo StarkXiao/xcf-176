@@ -13,6 +13,7 @@ import { reportRoutes } from './routes/reportRoutes.js';
 import { caseTemplateRoutes } from './routes/caseTemplateRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { anomalyAlertRoutes } from './routes/anomalyAlertRoutes.js';
+import { evidenceVersionRoutes } from './routes/evidenceVersionRoutes.js';
 import { PersistenceService } from './services/PersistenceService.js';
 
 const server = fastify({
@@ -36,6 +37,7 @@ server.register(investigationTaskRoutes, { prefix: '/api/investigation-tasks' })
 server.register(reportRoutes, { prefix: '/api/reports' });
 server.register(caseTemplateRoutes, { prefix: '/api/case-templates' });
 server.register(anomalyAlertRoutes, { prefix: '/api/anomaly-alerts' });
+server.register(evidenceVersionRoutes, { prefix: '/api/evidence-versions' });
 
 const start = async () => {
   try {

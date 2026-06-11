@@ -281,6 +281,34 @@ const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_status ON anomaly_alerts(status);
     CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_type ON anomaly_alerts(type);
     CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_detected_at ON anomaly_alerts(detected_at);
+
+    CREATE TABLE IF NOT EXISTS evidence_versions (
+      id TEXT PRIMARY KEY,
+      evidence_id TEXT NOT NULL,
+      case_id TEXT NOT NULL,
+      version_number INTEGER NOT NULL DEFAULT 1,
+      change_type TEXT NOT NULL,
+      change_summary TEXT NOT NULL DEFAULT '',
+      field_diffs TEXT NOT NULL DEFAULT '[]',
+      tag_changes TEXT NOT NULL DEFAULT '[]',
+      relation_changes TEXT NOT NULL DEFAULT '[]',
+      before_state TEXT,
+      after_state TEXT,
+      related_connections_snapshot TEXT,
+      collaborator_id TEXT,
+      collaborator_name TEXT,
+      restored_from_version_id TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+      FOREIGN KEY (evidence_id) REFERENCES evidence(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_evidence_id ON evidence_versions(evidence_id);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_case_id ON evidence_versions(case_id);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_version_number ON evidence_versions(evidence_id, version_number);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_created_at ON evidence_versions(created_at);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_collaborator ON evidence_versions(collaborator_id);
+    CREATE INDEX IF NOT EXISTS idx_evidence_versions_change_type ON evidence_versions(change_type);
   `);
 };
 

@@ -700,6 +700,98 @@ export interface UpdateAnomalyAlertDto {
   reviewedBy?: string;
 }
 
+export type EvidenceChangeType =
+  | 'create'
+  | 'update_content'
+  | 'update_tags'
+  | 'update_importance'
+  | 'update_status'
+  | 'update_position'
+  | 'update_size'
+  | 'update_color'
+  | 'update_assignment'
+  | 'update_timestamp'
+  | 'update_source'
+  | 'relation_add'
+  | 'relation_remove'
+  | 'relation_update'
+  | 'delete'
+  | 'restore';
+
+export interface FieldDiff {
+  field: string;
+  fieldLabel: string;
+  oldValue: unknown;
+  newValue: unknown;
+}
+
+export interface TagChange {
+  type: 'add' | 'remove';
+  tag: string;
+}
+
+export interface RelationChange {
+  type: 'add' | 'remove' | 'update';
+  connectionId: string;
+  fromEvidenceId?: string;
+  toEvidenceId?: string;
+  oldLabel?: string;
+  newLabel?: string;
+  oldColor?: string;
+  newColor?: string;
+  oldLineStyle?: string;
+  newLineStyle?: string;
+}
+
+export interface EvidenceVersion {
+  id: string;
+  evidenceId: string;
+  caseId: string;
+  versionNumber: number;
+  changeType: EvidenceChangeType;
+  changeSummary: string;
+  fieldDiffs: FieldDiff[];
+  tagChanges: TagChange[];
+  relationChanges: RelationChange[];
+  beforeState: Partial<Evidence> | null;
+  afterState: Partial<Evidence> | null;
+  relatedConnectionsSnapshot: Connection[] | null;
+  collaboratorId: string | null;
+  collaboratorName: string | null;
+  restoredFromVersionId?: string;
+  createdAt: string;
+}
+
+export interface CreateEvidenceVersionDto {
+  evidenceId: string;
+  caseId: string;
+  changeType: EvidenceChangeType;
+  changeSummary?: string;
+  beforeState?: Partial<Evidence> | null;
+  afterState?: Partial<Evidence> | null;
+  fieldDiffs?: FieldDiff[];
+  tagChanges?: TagChange[];
+  relationChanges?: RelationChange[];
+  relatedConnectionsSnapshot?: Connection[] | null;
+  collaboratorId?: string | null;
+  collaboratorName?: string | null;
+  restoredFromVersionId?: string;
+}
+
+export interface RestoreEvidenceVersionDto {
+  versionId: string;
+  collaboratorId?: string | null;
+  collaboratorName?: string | null;
+}
+
+export interface VersionDiffResult {
+  version: EvidenceVersion;
+  fieldDiffs: FieldDiff[];
+  tagChanges: TagChange[];
+  relationChanges: RelationChange[];
+  readableSummary: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;

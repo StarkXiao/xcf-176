@@ -2,6 +2,7 @@ import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
 import { InvestigationTaskService } from './InvestigationTaskService.js';
 import { AnomalyAlertService } from './AnomalyAlertService.js';
+import { EvidenceVersionService } from './EvidenceVersionService.js';
 import type { Evidence, CreateEvidenceDto, UpdateEvidenceDto, SearchFilter, SyncSourceChange } from '@shared/types';
 
 export const EvidenceService = {
@@ -52,16 +53,33 @@ export const EvidenceService = {
     return evidence;
   },
 
-  createEvidence: (dto: CreateEvidenceDto): Evidence => {
+  createEvidence: (dto: CreateEvidenceDto, collaboratorId?: string | null, collaboratorName?: string | null): Evidence => {
     const evidence = EvidenceRepository.create(dto);
+    try {
+      EvidenceVersionService.recordEvidenceCreate(evidence, collaboratorId ?? null, collaboratorName ?? null);
+    } catch (_e) {
+      // version logging should not break primary operation
+    }
     AnomalyAlertService.runDetectionForCase(dto.caseId);
     return evidence;
   },
 
-  updateEvidence: (id: string, dto: UpdateEvidenceDto): Evidence | null => {
+  updateEvidence: (id: string, dto: UpdateEvidenceDto, collaboratorId?: string | null, collaboratorName?: string | null): Evidence | null => {
     const existing = EvidenceRepository.findById(id);
     const updated = EvidenceRepository.update(id, dto);
     if (updated && existing) {
+      try {
+        EvidenceVersionService.recordEvidenceUpdate(
+          id,
+          dto,
+          existing,
+          updated,
+          collaboratorId ?? null,
+          collaboratorName ?? null
+        );
+      } catch (_e) {
+        // version logging should not break primary operation
+      }
       const changes: SyncSourceChange[] = [];
       if (dto.content !== undefined && dto.content !== existing.content) {
         changes.push({ field: 'content', oldValue: existing.content.slice(0, 20), newValue: dto.content.slice(0, 20) });
@@ -80,9 +98,16 @@ export const EvidenceService = {
     return updated;
   },
 
-  deleteEvidence: (id: string): boolean => {
+  deleteEvidence: (id: string, collaboratorId?: string | null, collaboratorName?: string | null): boolean => {
     const existing = EvidenceRepository.findById(id);
     const caseId = existing?.caseId;
+    if (existing) {
+      try {
+        EvidenceVersionService.recordEvidenceDelete(existing, collaboratorId ?? null, collaboratorName ?? null);
+      } catch (_e) {
+        // version logging should not break primary operation
+      }
+    }
     ConnectionRepository.deleteByEvidenceId(id);
     const deleted = EvidenceRepository.delete(id);
     if (deleted && caseId) {
