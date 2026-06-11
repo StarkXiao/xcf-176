@@ -25,6 +25,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
   const setSelectedConnectionId = useCanvasStore((state) => state.setSelectedConnectionId);
   const setSelectedId = useCanvasStore((state) => state.setSelectedId);
   const setTimelineHighlightId = useCanvasStore((state) => state.setTimelineHighlightId);
+  const isConnectionVisible = useCanvasStore((state) => state.isConnectionVisible);
+  const connectionGroups = useCanvasStore((state) => state.connectionGroups);
 
   const getStrokeDasharray = (style: Connection['lineStyle']) => {
     switch (style) {
@@ -95,16 +97,21 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
 
         if (!fromEvidence || !toEvidence) return null;
 
-        const isVisible = visibleConnectionIds === null || visibleConnectionIds.has(connection.id);
+        const isVisibleProp = visibleConnectionIds === null || visibleConnectionIds.has(connection.id);
+        const isStoreVisible = isConnectionVisible(connection.id);
+        const isVisible = isVisibleProp && isStoreVisible;
         const isHighlighted = highlightConnectionIds !== null && highlightConnectionIds.has(connection.id);
         const isSelected = selectedConnectionId === connection.id;
         const opacity = isVisible ? (isHighlighted ? 1 : 1) : 0.15;
         const dimmed = !isVisible;
 
+        const group = connectionGroups.find((g) => g.connectionIds.includes(connection.id));
+        const displayColor = group && group.visible ? group.color : connection.color;
+
         const { from, to } = getNearestEdge(fromEvidence, toEvidence);
         const path = getLinePath(from, to, 60);
         const midpoint = getLineMidpoint(from, to);
-        const color = connection.color || CYBERPUNK_COLORS.accentCyan;
+        const color = displayColor || CYBERPUNK_COLORS.accentCyan;
 
         return (
           <g

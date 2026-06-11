@@ -17,6 +17,7 @@ interface UiState {
   reportPanelOpen: boolean;
   anomalyAlertPanelOpen: boolean;
   crossCaseComparisonPanelOpen: boolean;
+  connectionGroupPanelOpen: boolean;
   saveStatus: SaveStatus;
   lastSaved: Date | null;
   currentTime: string;
@@ -48,6 +49,8 @@ interface UiState {
   setAnomalyAlertPanelOpen: (open: boolean) => void;
   toggleCrossCaseComparisonPanel: () => void;
   setCrossCaseComparisonPanelOpen: (open: boolean) => void;
+  toggleConnectionGroupPanel: () => void;
+  setConnectionGroupPanelOpen: (open: boolean) => void;
   setSaveStatus: (status: SaveStatus) => void;
   updateLastSaved: () => void;
   updateCurrentTime: () => void;
@@ -69,6 +72,7 @@ export const useUiStore = create<UiState>((set) => ({
   reportPanelOpen: false,
   anomalyAlertPanelOpen: false,
   crossCaseComparisonPanelOpen: false,
+  connectionGroupPanelOpen: false,
   saveStatus: 'idle',
   lastSaved: null,
   currentTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
@@ -113,6 +117,9 @@ export const useUiStore = create<UiState>((set) => ({
 
   toggleCrossCaseComparisonPanel: () => set((state) => ({ crossCaseComparisonPanelOpen: !state.crossCaseComparisonPanelOpen })),
   setCrossCaseComparisonPanelOpen: (open) => set({ crossCaseComparisonPanelOpen: open }),
+
+  toggleConnectionGroupPanel: () => set((state) => ({ connectionGroupPanelOpen: !state.connectionGroupPanelOpen })),
+  setConnectionGroupPanelOpen: (open) => set({ connectionGroupPanelOpen: open }),
 
   setSaveStatus: (status) => set({ saveStatus: status }),
 

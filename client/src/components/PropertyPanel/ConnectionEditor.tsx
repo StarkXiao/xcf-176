@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Trash2, Palette, PenLine, Sparkles } from 'lucide-react';
+import { Trash2, Palette, PenLine, Sparkles, Link2, X } from 'lucide-react';
 import { NeonInput } from '@/components/ui/NeonInput';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { useCanvasStore } from '@/store/useCanvasStore';
@@ -75,6 +75,7 @@ export const ConnectionEditor: React.FC<ConnectionEditorProps> = ({ connection }
         label: preset.label,
         color: preset.color,
         lineStyle: preset.lineStyle,
+        relationTypeId: preset.id,
       };
       patchConnection(connection.id, patch);
 
@@ -92,11 +93,36 @@ export const ConnectionEditor: React.FC<ConnectionEditorProps> = ({ connection }
           label: connection.label,
           color: connection.color,
           lineStyle: connection.lineStyle,
+          relationTypeId: connection.relationTypeId,
         });
       }
     },
     [connection, patchConnection]
   );
+
+  const handleRelationTypeChange = useCallback(
+    async (relationTypeId: string | null) => {
+      const snapshot = captureConnectionSnapshot(connection);
+      const patch: Partial<Connection> = { relationTypeId };
+      patchConnection(connection.id, patch);
+
+      try {
+        await connectionApi.update(connection.id, patch);
+        recordAuditLog(
+          'update_connection',
+          'connection',
+          connection.id,
+          relationTypeId ? '设置关系类型' : '清除关系类型',
+          snapshot
+        );
+      } catch {
+        patchConnection(connection.id, { relationTypeId: connection.relationTypeId });
+      }
+    },
+    [connection, patchConnection]
+  );
+
+  const currentRelationType = presetRelations.find((r) => r.id === connection.relationTypeId);
 
   const handleDelete = useCallback(async () => {
     const snapshot = captureConnectionSnapshot(connection);
@@ -163,7 +189,7 @@ export const ConnectionEditor: React.FC<ConnectionEditorProps> = ({ connection }
           </label>
           <div className="flex flex-wrap gap-2">
             {presetRelations.map((preset) => {
-              const isActive = connection.label === preset.label;
+              const isActive = connection.relationTypeId === preset.id;
               return (
                 <button
                   key={preset.id}
@@ -188,6 +214,91 @@ export const ConnectionEditor: React.FC<ConnectionEditorProps> = ({ connection }
           </div>
         </div>
       )}
+
+      <div className="space-y-2">
+        <label
+          className="block text-xs font-mono uppercase tracking-wider flex items-center gap-2"
+          style={{ color: CYBERPUNK_COLORS.textSecondary }}
+        >
+          <Link2 size={14} />
+          关系类型
+        </label>
+        <div className="space-y-2">
+          {currentRelationType ? (
+            <div
+              className="flex items-center justify-between p-2 rounded-sm border"
+              style={{
+                borderColor: currentRelationType.color,
+                backgroundColor: getGlowColor(currentRelationType.color, 0.08),
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span style={{ color: currentRelationType.color }}>●</span>
+                <span
+                  className="text-xs font-mono"
+                  style={{ color: currentRelationType.color }}
+                >
+                  {currentRelationType.label}
+                </span>
+              </div>
+              <button
+                className="p-1 rounded-sm hover:bg-red-500/20 transition-colors"
+                onClick={() => handleRelationTypeChange(null)}
+                title="清除关系类型"
+                style={{ color: CYBERPUNK_COLORS.accentRed }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <div
+              className="p-2 rounded-sm border text-xs font-mono text-center"
+              style={{
+                borderColor: CYBERPUNK_COLORS.borderColor,
+                color: CYBERPUNK_COLORS.textSecondary,
+                backgroundColor: CYBERPUNK_COLORS.bgTertiary,
+              }}
+            >
+              未指定关系类型
+            </div>
+          )}
+          {presetRelations.length > 0 && (
+            <div>
+              <select
+                className="w-full p-2 text-xs font-mono rounded-sm border bg-transparent"
+                style={{
+                  borderColor: CYBERPUNK_COLORS.borderColor,
+                  color: CYBERPUNK_COLORS.textPrimary,
+                  backgroundColor: CYBERPUNK_COLORS.bgTertiary,
+                }}
+                value={connection.relationTypeId || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value) {
+                    const preset = presetRelations.find((p) => p.id === value);
+                    if (preset) {
+                      handleApplyPreset(preset);
+                    }
+                  }
+                }}
+              >
+                <option value="" style={{ backgroundColor: CYBERPUNK_COLORS.bgTertiary }}>
+                  选择关系类型...
+                </option>
+                {presetRelations.map((preset) => (
+                  <option
+                    key={preset.id}
+                    value={preset.id}
+                    style={{ backgroundColor: CYBERPUNK_COLORS.bgTertiary }}
+                  >
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
 
       <div>
         <NeonInput

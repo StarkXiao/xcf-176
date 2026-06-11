@@ -51,6 +51,7 @@ export interface Connection {
   label: string;
   color: string;
   lineStyle: 'solid' | 'dashed' | 'dotted';
+  relationTypeId?: string | null;
   createdAt: string;
 }
 
@@ -310,6 +311,76 @@ export interface CreateConnectionDto {
   label?: string;
   color?: string;
   lineStyle?: Connection['lineStyle'];
+  relationTypeId?: string | null;
+}
+
+export interface ConnectionGroup {
+  id: string;
+  caseId: string;
+  name: string;
+  color: string;
+  lineStyle: 'solid' | 'dashed' | 'dotted';
+  relationTypeId?: string | null;
+  connectionIds: string[];
+  visible: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateConnectionGroupDto {
+  caseId: string;
+  name: string;
+  color?: string;
+  lineStyle?: Connection['lineStyle'];
+  relationTypeId?: string | null;
+  connectionIds?: string[];
+}
+
+export interface UpdateConnectionGroupDto {
+  name?: string;
+  color?: string;
+  lineStyle?: Connection['lineStyle'];
+  relationTypeId?: string | null;
+  connectionIds?: string[];
+  visible?: boolean;
+}
+
+export interface BulkUpdateConnectionsByTypeDto {
+  caseId: string;
+  relationTypeId: string;
+  color?: string;
+  lineStyle?: Connection['lineStyle'];
+  visible?: boolean;
+}
+
+export interface BulkUpdateConnectionsByLabelDto {
+  caseId: string;
+  label: string;
+  color?: string;
+  lineStyle?: Connection['lineStyle'];
+  visible?: boolean;
+}
+
+export interface ConnectionTypeStats {
+  relationTypeId: string | null;
+  label: string;
+  color: string;
+  count: number;
+  connectionIds: string[];
+}
+
+export interface BulkToggleVisibilityDto {
+  caseId: string;
+  connectionIds: string[];
+  visible: boolean;
+}
+
+export interface BulkApplyStyleDto {
+  caseId: string;
+  connectionIds: string[];
+  color?: string;
+  lineStyle?: Connection['lineStyle'];
+  relationTypeId?: string | null;
 }
 
 export interface CreateCollaboratorDto {

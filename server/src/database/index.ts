@@ -66,6 +66,7 @@ const createTables = () => {
       label TEXT,
       color TEXT DEFAULT '#6b7280',
       line_style TEXT NOT NULL DEFAULT 'solid',
+      relation_type_id TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       archived_at TEXT,
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
@@ -73,7 +74,26 @@ const createTables = () => {
       FOREIGN KEY (to_evidence_id) REFERENCES evidence(id)
     );
 
+    CREATE TABLE IF NOT EXISTS connection_groups (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#6b7280',
+      line_style TEXT NOT NULL DEFAULT 'solid',
+      relation_type_id TEXT,
+      connection_ids TEXT NOT NULL DEFAULT '[]',
+      visible INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_connections_archived_at ON connections(archived_at);
+    CREATE INDEX IF NOT EXISTS idx_connections_relation_type ON connections(relation_type_id);
+    CREATE INDEX IF NOT EXISTS idx_connections_case_label ON connections(case_id, label);
+
+    CREATE INDEX IF NOT EXISTS idx_connection_groups_case_id ON connection_groups(case_id);
+    CREATE INDEX IF NOT EXISTS idx_connection_groups_relation_type ON connection_groups(relation_type_id);
 
     CREATE TABLE IF NOT EXISTS collaborators (
       id TEXT PRIMARY KEY,
@@ -411,7 +431,33 @@ const runMigrations = () => {
   if (!connColumnNames.includes('archived_at')) {
     db.exec('ALTER TABLE connections ADD COLUMN archived_at TEXT');
   }
+  if (!connColumnNames.includes('relation_type_id')) {
+    db.exec('ALTER TABLE connections ADD COLUMN relation_type_id TEXT');
+  }
   db.exec('CREATE INDEX IF NOT EXISTS idx_connections_archived_at ON connections(archived_at);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_connections_relation_type ON connections(relation_type_id);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_connections_case_label ON connections(case_id, label);');
+
+  const connGroupsTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='connection_groups'").get() as { name: string } | undefined;
+  if (!connGroupsTableExists) {
+    db.exec(`
+      CREATE TABLE connection_groups (
+        id TEXT PRIMARY KEY,
+        case_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT '#6b7280',
+        line_style TEXT NOT NULL DEFAULT 'solid',
+        relation_type_id TEXT,
+        connection_ids TEXT NOT NULL DEFAULT '[]',
+        visible INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+      );
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_connection_groups_case_id ON connection_groups(case_id);');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_connection_groups_relation_type ON connection_groups(relation_type_id);');
+  }
 
   const connFkList = db.prepare("PRAGMA foreign_key_list(connections)").all() as Array<{ id: number; table: string; from: string; to: string; on_delete: string }>;
   const fromFk = connFkList.find(fk => fk.from === 'from_evidence_id');

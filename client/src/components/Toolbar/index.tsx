@@ -21,6 +21,7 @@ import {
   GitCompare,
   CalendarDays,
   RotateCcw,
+  Layers,
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -52,6 +53,7 @@ export const Toolbar: React.FC = () => {
   const toggleInvestigationTaskPanel = useUiStore((state) => state.toggleInvestigationTaskPanel);
   const toggleAnomalyAlertPanel = useUiStore((state) => state.toggleAnomalyAlertPanel);
   const toggleReportPanel = useUiStore((state) => state.toggleReportPanel);
+  const toggleConnectionGroupPanel = useUiStore((state) => state.toggleConnectionGroupPanel);
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const propertyPanelOpen = useUiStore((state) => state.propertyPanelOpen);
   const collaboratorPanelOpen = useUiStore((state) => state.collaboratorPanelOpen);
@@ -64,6 +66,7 @@ export const Toolbar: React.FC = () => {
   const investigationTaskPanelOpen = useUiStore((state) => state.investigationTaskPanelOpen);
   const anomalyAlertPanelOpen = useUiStore((state) => state.anomalyAlertPanelOpen);
   const reportPanelOpen = useUiStore((state) => state.reportPanelOpen);
+  const connectionGroupPanelOpen = useUiStore((state) => state.connectionGroupPanelOpen);
   const timelineMode = useCanvasStore((state) => state.timelineMode);
   const toggleTimelineMode = useCanvasStore((state) => state.toggleTimelineMode);
   const arrangeByTimeline = useEvidenceStore((state) => state.arrangeByTimeline);
@@ -357,6 +360,14 @@ export const Toolbar: React.FC = () => {
           icon={<GitCompare size={16} />}
           onClick={toggleCrossCaseComparisonPanel}
           glow={crossCaseComparisonPanelOpen}
+        />
+        <NeonButton
+          size="sm"
+          variant="primary"
+          icon={<Layers size={16} />}
+          onClick={toggleConnectionGroupPanel}
+          glow={connectionGroupPanelOpen}
+          title="关系连线分组管理"
         />
         <NeonButton
           size="sm"

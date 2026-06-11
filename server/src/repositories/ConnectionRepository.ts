@@ -10,6 +10,7 @@ interface ConnectionRow {
   label: string | null;
   color: string;
   line_style: string;
+  relation_type_id: string | null;
   created_at: string;
   archived_at: string | null;
 }
@@ -22,6 +23,7 @@ const rowToConnection = (row: ConnectionRow): Connection => ({
   label: row.label ?? '',
   color: row.color,
   lineStyle: row.line_style as Connection['lineStyle'],
+  relationTypeId: row.relation_type_id,
   createdAt: row.created_at,
 });
 
@@ -132,8 +134,8 @@ export const ConnectionRepository = {
     const stmt = db.prepare(`
       INSERT INTO connections (
         id, case_id, from_evidence_id, to_evidence_id,
-        label, color, line_style, created_at, archived_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        label, color, line_style, relation_type_id, created_at, archived_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     `);
     stmt.run(
       id,
@@ -143,6 +145,7 @@ export const ConnectionRepository = {
       dto.label ?? null,
       dto.color ?? '#6b7280',
       dto.lineStyle ?? 'solid',
+      dto.relationTypeId ?? null,
       now
     );
     return ConnectionRepository.findByIdIncludeArchived(id)!;
@@ -174,7 +177,7 @@ export const ConnectionRepository = {
     return result.changes > 0;
   },
 
-  update: (id: string, dto: Partial<Pick<Connection, 'label' | 'color' | 'lineStyle'>>): Connection | null => {
+  update: (id: string, dto: Partial<Pick<Connection, 'label' | 'color' | 'lineStyle' | 'relationTypeId'>>): Connection | null => {
     const existing = ConnectionRepository.findByIdIncludeArchived(id);
     if (!existing) return null;
 
@@ -184,6 +187,7 @@ export const ConnectionRepository = {
     if (dto.label !== undefined) { fields.push('label = ?'); values.push(dto.label); }
     if (dto.color !== undefined) { fields.push('color = ?'); values.push(dto.color); }
     if (dto.lineStyle !== undefined) { fields.push('line_style = ?'); values.push(dto.lineStyle); }
+    if (dto.relationTypeId !== undefined) { fields.push('relation_type_id = ?'); values.push(dto.relationTypeId); }
 
     if (fields.length > 0) {
       values.push(id);
@@ -192,6 +196,107 @@ export const ConnectionRepository = {
     }
 
     return ConnectionRepository.findById(id);
+  },
+
+  findByRelationTypeId: (caseId: string, relationTypeId: string): Connection[] => {
+    const rows = db.prepare(`
+      SELECT * FROM connections 
+      WHERE case_id = ? AND relation_type_id = ? AND archived_at IS NULL
+      ORDER BY created_at ASC
+    `).all(caseId, relationTypeId) as ConnectionRow[];
+    return rows.map(rowToConnection);
+  },
+
+  findByLabel: (caseId: string, label: string): Connection[] => {
+    const rows = db.prepare(`
+      SELECT * FROM connections 
+      WHERE case_id = ? AND label = ? AND archived_at IS NULL
+      ORDER BY created_at ASC
+    `).all(caseId, label) as ConnectionRow[];
+    return rows.map(rowToConnection);
+  },
+
+  getTypeStats: (caseId: string): Array<{ relationTypeId: string | null; label: string; color: string; count: number; connectionIds: string[] }> => {
+    const rows = db.prepare(`
+      SELECT 
+        relation_type_id,
+        COALESCE(label, '未分类') as label,
+        color,
+        COUNT(*) as count,
+        GROUP_CONCAT(id) as ids
+      FROM connections 
+      WHERE case_id = ? AND archived_at IS NULL
+      GROUP BY relation_type_id, label, color
+      ORDER BY count DESC
+    `).all(caseId) as Array<{ relation_type_id: string | null; label: string; color: string; count: number; ids: string }>;
+    
+    return rows.map(row => ({
+      relationTypeId: row.relation_type_id,
+      label: row.label,
+      color: row.color,
+      count: row.count,
+      connectionIds: row.ids ? row.ids.split(',') : [],
+    }));
+  },
+
+  bulkUpdateByRelationType: (caseId: string, relationTypeId: string, dto: { color?: string; lineStyle?: Connection['lineStyle']; relationTypeId?: string | null }): number => {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+
+    if (dto.color !== undefined) { fields.push('color = ?'); values.push(dto.color); }
+    if (dto.lineStyle !== undefined) { fields.push('line_style = ?'); values.push(dto.lineStyle); }
+    if (dto.relationTypeId !== undefined) { fields.push('relation_type_id = ?'); values.push(dto.relationTypeId); }
+
+    if (fields.length === 0) return 0;
+
+    values.push(caseId, relationTypeId);
+    const stmt = db.prepare(`
+      UPDATE connections SET ${fields.join(', ')} 
+      WHERE case_id = ? AND relation_type_id = ? AND archived_at IS NULL
+    `);
+    const result = stmt.run(...values);
+    return result.changes;
+  },
+
+  bulkUpdateByLabel: (caseId: string, label: string, dto: { color?: string; lineStyle?: Connection['lineStyle']; relationTypeId?: string | null }): number => {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+
+    if (dto.color !== undefined) { fields.push('color = ?'); values.push(dto.color); }
+    if (dto.lineStyle !== undefined) { fields.push('line_style = ?'); values.push(dto.lineStyle); }
+    if (dto.relationTypeId !== undefined) { fields.push('relation_type_id = ?'); values.push(dto.relationTypeId); }
+
+    if (fields.length === 0) return 0;
+
+    values.push(caseId, label);
+    const stmt = db.prepare(`
+      UPDATE connections SET ${fields.join(', ')} 
+      WHERE case_id = ? AND label = ? AND archived_at IS NULL
+    `);
+    const result = stmt.run(...values);
+    return result.changes;
+  },
+
+  bulkUpdateByIds: (connectionIds: string[], dto: { color?: string; lineStyle?: Connection['lineStyle']; relationTypeId?: string | null }): number => {
+    if (connectionIds.length === 0) return 0;
+
+    const fields: string[] = [];
+    const values: unknown[] = [];
+
+    if (dto.color !== undefined) { fields.push('color = ?'); values.push(dto.color); }
+    if (dto.lineStyle !== undefined) { fields.push('line_style = ?'); values.push(dto.lineStyle); }
+    if (dto.relationTypeId !== undefined) { fields.push('relation_type_id = ?'); values.push(dto.relationTypeId); }
+
+    if (fields.length === 0) return 0;
+
+    const placeholders = connectionIds.map(() => '?').join(', ');
+    values.push(...connectionIds);
+    const stmt = db.prepare(`
+      UPDATE connections SET ${fields.join(', ')} 
+      WHERE id IN (${placeholders}) AND archived_at IS NULL
+    `);
+    const result = stmt.run(...values);
+    return result.changes;
   },
 
   deleteByCaseId: (caseId: string): number => {
