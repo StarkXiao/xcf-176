@@ -203,6 +203,12 @@ export const AnomalyAlertRepository = {
     return result.changes;
   },
 
+  deletePendingByCaseId: (caseId: string): number => {
+    const stmt = db.prepare("DELETE FROM anomaly_alerts WHERE case_id = ? AND status = 'pending'");
+    const result = stmt.run(caseId);
+    return result.changes;
+  },
+
   deleteByTypeAndCase: (caseId: string, type: AnomalyAlertType): number => {
     const stmt = db.prepare('DELETE FROM anomaly_alerts WHERE case_id = ? AND type = ?');
     const result = stmt.run(caseId, type);
@@ -211,8 +217,8 @@ export const AnomalyAlertRepository = {
 
   existsByCaseAndType: (caseId: string, type: AnomalyAlertType): boolean => {
     const row = db.prepare(
-      'SELECT COUNT(*) as count FROM anomaly_alerts WHERE case_id = ? AND type = ? AND status = ?'
-    ).get(caseId, type, 'pending') as { count: number };
+      'SELECT COUNT(*) as count FROM anomaly_alerts WHERE case_id = ? AND type = ?'
+    ).get(caseId, type) as { count: number };
     return row.count > 0;
   },
 };

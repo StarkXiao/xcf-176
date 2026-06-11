@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { builtInTemplates } from '../data/builtInTemplates.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const dataDir = path.join(__dirname, '../../data');
@@ -21,6 +22,8 @@ const createTables = () => {
       status TEXT NOT NULL DEFAULT 'pending',
       key_clues TEXT DEFAULT '[]',
       canvas_state TEXT,
+      template_id TEXT,
+      template_metadata TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -222,6 +225,56 @@ const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_investigation_tasks_status ON investigation_tasks(status);
     CREATE INDEX IF NOT EXISTS idx_investigation_tasks_assignee_id ON investigation_tasks(assignee_id);
     CREATE INDEX IF NOT EXISTS idx_investigation_tasks_deadline ON investigation_tasks(deadline);
+
+    CREATE TABLE IF NOT EXISTS case_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'other',
+      description TEXT DEFAULT '',
+      icon TEXT,
+      color TEXT DEFAULT '#3b82f6',
+      evidence_fields TEXT DEFAULT '[]',
+      relation_types TEXT DEFAULT '[]',
+      investigation_steps TEXT DEFAULT '[]',
+      default_tags TEXT DEFAULT '[]',
+      is_built_in INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_case_templates_category ON case_templates(category);
+    CREATE INDEX IF NOT EXISTS idx_case_templates_built_in ON case_templates(is_built_in);
+
+    CREATE TABLE IF NOT EXISTS anomaly_alerts (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      case_name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      score REAL NOT NULL DEFAULT 0,
+      evidence_count INTEGER NOT NULL DEFAULT 0,
+      connection_count INTEGER NOT NULL DEFAULT 0,
+      critical_evidence_count INTEGER NOT NULL DEFAULT 0,
+      high_evidence_count INTEGER NOT NULL DEFAULT 0,
+      burst_start TEXT,
+      burst_end TEXT,
+      evidence_ids TEXT NOT NULL DEFAULT '[]',
+      connection_ids TEXT NOT NULL DEFAULT '[]',
+      detected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at TEXT,
+      reviewed_by TEXT,
+      notes TEXT,
+      FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_case_id ON anomaly_alerts(case_id);
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_severity ON anomaly_alerts(severity);
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_status ON anomaly_alerts(status);
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_type ON anomaly_alerts(type);
+    CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_detected_at ON anomaly_alerts(detected_at);
   `);
 };
 const runMigrations = () => {
@@ -240,6 +293,12 @@ const runMigrations = () => {
     }
     if (!caseColumnNames.includes('key_clues')) {
         db.exec("ALTER TABLE cases ADD COLUMN key_clues TEXT DEFAULT '[]'");
+    }
+    if (!caseColumnNames.includes('template_id')) {
+        db.exec('ALTER TABLE cases ADD COLUMN template_id TEXT');
+    }
+    if (!caseColumnNames.includes('template_metadata')) {
+        db.exec('ALTER TABLE cases ADD COLUMN template_metadata TEXT');
     }
 };
 const seedData = () => {
@@ -732,7 +791,24 @@ const seedData = () => {
         insertTask.run(t.id, caseId, t.title, t.description, t.priority, t.status, t.assigneeId, t.assigneeName, t.deadline, JSON.stringify(t.evidenceIds), JSON.stringify(t.collectionItemIds), JSON.stringify(t.connectionIds), t.createdBy, t.createdByName, t.completedAt, t.createdAt, t.updatedAt);
     }
 };
+const seedTemplates = () => {
+    const templateCount = db.prepare('SELECT COUNT(*) as count FROM case_templates').get();
+    if (templateCount.count > 0)
+        return;
+    const insertTemplate = db.prepare(`
+    INSERT INTO case_templates (
+      id, name, category, description, icon, color,
+      evidence_fields, relation_types, investigation_steps, default_tags,
+      is_built_in, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+    const now = new Date().toISOString();
+    for (const tpl of builtInTemplates) {
+        insertTemplate.run(tpl.id, tpl.name, tpl.category, tpl.description ?? null, tpl.icon ?? null, tpl.color ?? '#3b82f6', JSON.stringify(tpl.evidenceFields ?? []), JSON.stringify(tpl.relationTypes ?? []), JSON.stringify(tpl.investigationSteps ?? []), JSON.stringify(tpl.defaultTags ?? []), 1, now, now);
+    }
+};
 createTables();
 runMigrations();
 seedData();
+seedTemplates();
 export default db;

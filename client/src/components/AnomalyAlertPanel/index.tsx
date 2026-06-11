@@ -17,6 +17,12 @@ import { NeonButton } from '@/components/ui/NeonButton';
 import { useCaseStore } from '@/store/useCaseStore';
 import { useAnomalyAlertStore } from '@/store/useAnomalyAlertStore';
 import { useUiStore } from '@/store/useUiStore';
+import { useEvidenceStore } from '@/store/useEvidenceStore';
+import { useCanvasStore } from '@/store/useCanvasStore';
+import { useInvestigationTaskStore } from '@/store/useInvestigationTaskStore';
+import { useCollaboratorStore } from '@/store/useCollaboratorStore';
+import { useAuditLogStore } from '@/store/useAuditLogStore';
+import { useCaseTemplateStore } from '@/store/useCaseTemplateStore';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
 import type {
   AnomalyAlert,
@@ -327,18 +333,30 @@ function PriorityCaseCard({
 
 export const AnomalyAlertPanel: React.FC = () => {
   const currentCase = useCaseStore((state) => state.currentCase);
-  const { alerts, priorityCases, loading, loadAlertsByCaseId, loadPriorityCases, detectForCase, dismissAlert, resolveAlert, updateAlert } = useAnomalyAlertStore();
+  const { alerts, priorityCases, loading, loadAlerts, loadAlertsByCaseId, loadPriorityCases, detectForCase, dismissAlert, resolveAlert, updateAlert } = useAnomalyAlertStore();
   const setCaseSelectorOpen = useUiStore((state) => state.setCaseSelectorOpen);
+  const setAnomalyAlertPanelOpen = useUiStore((state) => state.setAnomalyAlertPanelOpen);
+  const setEvidence = useEvidenceStore((state) => state.setEvidence);
+  const setConnections = useCanvasStore((state) => state.setConnections);
+  const setZoom = useCanvasStore((state) => state.setZoom);
+  const setPan = useCanvasStore((state) => state.setPan);
+  const setSelectedId = useCanvasStore((state) => state.setSelectedId);
+  const setSelectedConnectionId = useCanvasStore((state) => state.setSelectedConnectionId);
   const [viewMode, setViewMode] = useState<'alerts' | 'priority'>('alerts');
   const [filter, setFilter] = useState<FilterMode>('pending');
+  const [alertScope, setAlertScope] = useState<'current' | 'all'>('current');
 
   useEffect(() => {
-    if (currentCase) {
-      loadAlertsByCaseId(currentCase.id);
-    } else {
+    if (viewMode === 'priority') {
       loadPriorityCases();
+    } else if (viewMode === 'alerts') {
+      if (alertScope === 'current' && currentCase) {
+        loadAlertsByCaseId(currentCase.id);
+      } else {
+        loadAlerts();
+      }
     }
-  }, [currentCase, loadAlertsByCaseId, loadPriorityCases]);
+  }, [viewMode, alertScope, currentCase, loadAlerts, loadAlertsByCaseId, loadPriorityCases]);
 
   const filteredAlerts = useMemo(() => {
     if (filter === 'all') return alerts;
@@ -349,16 +367,49 @@ export const AnomalyAlertPanel: React.FC = () => {
   const pendingCount = alerts.filter((a) => a.status === 'pending').length;
 
   const handleRefresh = async () => {
-    if (currentCase) {
-      await detectForCase(currentCase.id);
-    } else {
+    if (viewMode === 'priority') {
       await loadPriorityCases();
+    } else if (viewMode === 'alerts') {
+      if (alertScope === 'current' && currentCase) {
+        await detectForCase(currentCase.id);
+      } else {
+        await loadAlerts();
+      }
     }
   };
 
-  const handleSelectCase = (caseId: string) => {
+  const handleSelectCase = async (caseId: string) => {
     const loadCase = useCaseStore.getState().loadCase;
-    loadCase(caseId);
+    await loadCase(caseId);
+
+    const currentCaseData = useCaseStore.getState().currentCase;
+    if (currentCaseData) {
+      setEvidence(currentCaseData.evidence);
+      setConnections(currentCaseData.connections);
+
+      if (currentCaseData.canvasState) {
+        setZoom(currentCaseData.canvasState.zoom);
+        setPan(currentCaseData.canvasState.panX, currentCaseData.canvasState.panY);
+      } else {
+        setZoom(1);
+        setPan(0, 0);
+      }
+
+      setSelectedId(null);
+      setSelectedConnectionId(null);
+
+      useCollaboratorStore.getState().loadCollaborators(caseId);
+      useAuditLogStore.getState().loadAuditLogs(caseId);
+      useInvestigationTaskStore.getState().loadTasks(caseId);
+
+      if (currentCaseData.templateId) {
+        useCaseTemplateStore.getState().loadAppliedTemplateForCase(caseId, currentCaseData.templateId);
+      } else {
+        useCaseTemplateStore.getState().setAppliedTemplateData(null);
+      }
+    }
+
+    setCaseSelectorOpen(false);
   };
 
   return (
@@ -433,6 +484,28 @@ export const AnomalyAlertPanel: React.FC = () => {
         >
           优先案件
         </NeonButton>
+        {viewMode === 'alerts' && currentCase && (
+          <>
+            <div
+              className="w-px mx-1"
+              style={{ backgroundColor: CYBERPUNK_COLORS.borderColor }}
+            />
+            <NeonButton
+              size="sm"
+              variant={alertScope === 'current' ? 'warning' : 'secondary'}
+              onClick={() => setAlertScope('current')}
+            >
+              当前案件
+            </NeonButton>
+            <NeonButton
+              size="sm"
+              variant={alertScope === 'all' ? 'warning' : 'secondary'}
+              onClick={() => setAlertScope('all')}
+            >
+              全部案件
+            </NeonButton>
+          </>
+        )}
       </div>
 
       {viewMode === 'alerts' && (

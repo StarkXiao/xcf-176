@@ -7,6 +7,8 @@ const rowToCase = (row) => ({
     status: row.status,
     keyClues: JSON.parse(row.key_clues),
     canvasState: row.canvas_state ? JSON.parse(row.canvas_state) : undefined,
+    templateId: row.template_id ?? undefined,
+    templateMetadata: row.template_metadata ? JSON.parse(row.template_metadata) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
 });
@@ -19,14 +21,21 @@ export const CaseRepository = {
         const row = db.prepare('SELECT * FROM cases WHERE id = ?').get(id);
         return row ? rowToCase(row) : null;
     },
-    create: (dto) => {
+    create: (dto, template) => {
         const id = uuidv4();
         const now = new Date().toISOString();
+        const templateMetadata = template ? {
+            templateName: template.name,
+            category: template.category,
+            evidenceFieldIds: template.evidenceFields.map(f => f.id),
+            relationTypeIds: template.relationTypes.map(r => r.id),
+            investigationStepIds: template.investigationSteps.map(s => s.id),
+        } : undefined;
         const stmt = db.prepare(`
-      INSERT INTO cases (id, name, description, status, key_clues, created_at, updated_at)
-      VALUES (?, ?, ?, 'pending', '[]', ?, ?)
+      INSERT INTO cases (id, name, description, status, key_clues, template_id, template_metadata, created_at, updated_at)
+      VALUES (?, ?, ?, 'pending', '[]', ?, ?, ?, ?)
     `);
-        stmt.run(id, dto.name, dto.description ?? null, now, now);
+        stmt.run(id, dto.name, dto.description ?? null, template ? template.id : null, templateMetadata ? JSON.stringify(templateMetadata) : null, now, now);
         return CaseRepository.findById(id);
     },
     update: (id, dto) => {
@@ -55,6 +64,14 @@ export const CaseRepository = {
         if (dto.canvasState !== undefined) {
             fields.push('canvas_state = ?');
             values.push(JSON.stringify(dto.canvasState));
+        }
+        if (dto.templateId !== undefined) {
+            fields.push('template_id = ?');
+            values.push(dto.templateId);
+        }
+        if (dto.templateMetadata !== undefined) {
+            fields.push('template_metadata = ?');
+            values.push(dto.templateMetadata ? JSON.stringify(dto.templateMetadata) : null);
         }
         fields.push('updated_at = ?');
         values.push(now);

@@ -1,5 +1,6 @@
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
 import { InvestigationTaskService } from './InvestigationTaskService.js';
+import { AnomalyAlertService } from './AnomalyAlertService.js';
 export const ConnectionService = {
     getAllConnections: () => {
         return ConnectionRepository.findAll();
@@ -14,7 +15,9 @@ export const ConnectionService = {
         return ConnectionRepository.findByEvidenceId(evidenceId);
     },
     createConnection: (dto) => {
-        return ConnectionRepository.create(dto);
+        const connection = ConnectionRepository.create(dto);
+        AnomalyAlertService.runDetectionForCase(dto.caseId);
+        return connection;
     },
     updateConnection: (id, dto) => {
         const existing = ConnectionRepository.findById(id);
@@ -30,11 +33,18 @@ export const ConnectionService = {
             if (changes.length > 0) {
                 InvestigationTaskService.onConnectionUpdated(id, changes);
             }
+            AnomalyAlertService.runDetectionForCase(updated.caseId);
         }
         return updated;
     },
     deleteConnection: (id) => {
-        return ConnectionRepository.delete(id);
+        const existing = ConnectionRepository.findById(id);
+        const caseId = existing?.caseId;
+        const deleted = ConnectionRepository.delete(id);
+        if (deleted && caseId) {
+            AnomalyAlertService.runDetectionForCase(caseId);
+        }
+        return deleted;
     },
     deleteConnectionsByCaseId: (caseId) => {
         return ConnectionRepository.deleteByCaseId(caseId);

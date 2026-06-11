@@ -79,6 +79,11 @@ export const CaseSelector: React.FC = () => {
     handleClose();
   };
 
+  const handleSelectPriorityCase = async (caseData: Case) => {
+    await handleSelectCase(caseData);
+    setAnomalyAlertPanelOpen(true);
+  };
+
   const handleDeleteCase = async (e: React.MouseEvent, caseId: string) => {
     e.stopPropagation();
     if (confirm('确定要删除此案件吗？所有相关证据将被删除。')) {
@@ -216,10 +221,9 @@ export const CaseSelector: React.FC = () => {
                                     color: severityColor[priority.priorityLevel],
                                     border: `1px solid ${getGlowColor(severityColor[priority.priorityLevel], 0.3)}`,
                                   }}
-                                  onClick={(e) => {
+                                  onClick={async (e) => {
                                     e.stopPropagation();
-                                    handleSelectCase(caseItem);
-                                    setAnomalyAlertPanelOpen(true);
+                                    await handleSelectPriorityCase(caseItem);
                                   }}
                                   title={`${priority.alerts.length} 个预警，点击查看`}
                                 >

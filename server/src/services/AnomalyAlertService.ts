@@ -489,7 +489,7 @@ export const AnomalyAlertService = {
     const connections = ConnectionRepository.findByCaseId(caseId);
     const mergedConfig = mergeConfig(config);
 
-    AnomalyAlertRepository.deleteByCaseId(caseId);
+    AnomalyAlertRepository.deletePendingByCaseId(caseId);
 
     const alerts = detectCaseAnomalies(caseData, evidence, connections, mergedConfig);
     const caseAlerts = AnomalyAlertRepository.findByCaseId(caseId);
