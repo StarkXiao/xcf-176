@@ -14,6 +14,7 @@ import { TraceAnalysisPanel } from '@/components/TraceAnalysisPanel';
 import { InvestigationTaskPanel } from '@/components/InvestigationTaskPanel';
 import { AnomalyAlertPanel } from '@/components/AnomalyAlertPanel';
 import { ReportPanel } from '@/components/ReportPanel';
+import { CrossCaseComparisonPanel } from '@/components/CrossCaseComparisonPanel';
 import { ScanlineEffect } from '@/components/ui/ScanlineEffect';
 import { useUiStore } from '@/store/useUiStore';
 import { useCaseStore } from '@/store/useCaseStore';
@@ -39,6 +40,7 @@ const Home: React.FC = () => {
   const investigationTaskPanelOpen = useUiStore((state) => state.investigationTaskPanelOpen);
   const anomalyAlertPanelOpen = useUiStore((state) => state.anomalyAlertPanelOpen);
   const reportPanelOpen = useUiStore((state) => state.reportPanelOpen);
+  const crossCaseComparisonPanelOpen = useUiStore((state) => state.crossCaseComparisonPanelOpen);
   const loadCollaborators = useCollaboratorStore((state) => state.loadCollaborators);
   const loadAuditLogs = useAuditLogStore((state) => state.loadAuditLogs);
   const loadTasks = useInvestigationTaskStore((state) => state.loadTasks);
@@ -128,6 +130,7 @@ const Home: React.FC = () => {
         {investigationTaskPanelOpen && <InvestigationTaskPanel />}
         {anomalyAlertPanelOpen && <AnomalyAlertPanel />}
         {reportPanelOpen && <ReportPanel />}
+        {crossCaseComparisonPanelOpen && <CrossCaseComparisonPanel />}
         <PropertyPanel />
       </div>
 

@@ -18,6 +18,7 @@ import {
   ClipboardList,
   FileText,
   AlertTriangle,
+  GitCompare,
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -44,6 +45,7 @@ export const Toolbar: React.FC = () => {
   const toggleEvidenceCollectionPanel = useUiStore((state) => state.toggleEvidenceCollectionPanel);
   const toggleConsultationPanel = useUiStore((state) => state.toggleConsultationPanel);
   const toggleTraceAnalysisPanel = useUiStore((state) => state.toggleTraceAnalysisPanel);
+  const toggleCrossCaseComparisonPanel = useUiStore((state) => state.toggleCrossCaseComparisonPanel);
   const toggleInvestigationTaskPanel = useUiStore((state) => state.toggleInvestigationTaskPanel);
   const toggleAnomalyAlertPanel = useUiStore((state) => state.toggleAnomalyAlertPanel);
   const toggleReportPanel = useUiStore((state) => state.toggleReportPanel);
@@ -55,6 +57,7 @@ export const Toolbar: React.FC = () => {
   const evidenceCollectionPanelOpen = useUiStore((state) => state.evidenceCollectionPanelOpen);
   const consultationPanelOpen = useUiStore((state) => state.consultationPanelOpen);
   const traceAnalysisPanelOpen = useUiStore((state) => state.traceAnalysisPanelOpen);
+  const crossCaseComparisonPanelOpen = useUiStore((state) => state.crossCaseComparisonPanelOpen);
   const investigationTaskPanelOpen = useUiStore((state) => state.investigationTaskPanelOpen);
   const anomalyAlertPanelOpen = useUiStore((state) => state.anomalyAlertPanelOpen);
   const reportPanelOpen = useUiStore((state) => state.reportPanelOpen);
@@ -303,6 +306,13 @@ export const Toolbar: React.FC = () => {
           icon={<GitBranch size={16} />}
           onClick={toggleTraceAnalysisPanel}
           glow={traceAnalysisPanelOpen}
+        />
+        <NeonButton
+          size="sm"
+          variant="danger"
+          icon={<GitCompare size={16} />}
+          onClick={toggleCrossCaseComparisonPanel}
+          glow={crossCaseComparisonPanelOpen}
         />
         <NeonButton
           size="sm"

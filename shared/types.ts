@@ -816,3 +816,97 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+export type CrossCaseMatchType = 'duplicate_evidence' | 'shared_source' | 'similar_structure' | 'crime_chain';
+
+export type CrossCaseMatchConfidence = 'low' | 'medium' | 'high';
+
+export interface CrossCaseEvidenceRef {
+  caseId: string;
+  caseName: string;
+  evidenceId: string;
+  evidenceContent: string;
+  evidenceSource: string;
+  evidenceImportance: Evidence['importance'];
+  evidenceTags: string[];
+  evidenceTimestamp: string;
+}
+
+export interface DuplicateEvidenceGroup {
+  id: string;
+  matchType: 'duplicate_evidence';
+  confidence: CrossCaseMatchConfidence;
+  score: number;
+  description: string;
+  evidenceRefs: CrossCaseEvidenceRef[];
+  similarityFields: string[];
+}
+
+export interface SharedSourceGroup {
+  id: string;
+  matchType: 'shared_source';
+  confidence: CrossCaseMatchConfidence;
+  score: number;
+  description: string;
+  sourceIdentifier: string;
+  sourceType: 'content_hash' | 'source_name' | 'source_url';
+  evidenceRefs: CrossCaseEvidenceRef[];
+}
+
+export interface SimilarStructureGroup {
+  id: string;
+  matchType: 'similar_structure';
+  confidence: CrossCaseMatchConfidence;
+  score: number;
+  description: string;
+  caseIdA: string;
+  caseNameA: string;
+  caseIdB: string;
+  caseNameB: string;
+  connectionLabelsA: string[];
+  connectionLabelsB: string[];
+  overlapRatio: number;
+  evidenceRefs: CrossCaseEvidenceRef[];
+}
+
+export interface CrimeChainLink {
+  id: string;
+  matchType: 'crime_chain';
+  confidence: CrossCaseMatchConfidence;
+  score: number;
+  description: string;
+  linkedCases: Array<{
+    caseId: string;
+    caseName: string;
+    role: string;
+  }>;
+  evidenceRefs: CrossCaseEvidenceRef[];
+  chainPattern: string;
+}
+
+export type CrossCaseMatchGroup = DuplicateEvidenceGroup | SharedSourceGroup | SimilarStructureGroup | CrimeChainLink;
+
+export interface CrossCaseComparisonConfig {
+  caseIds?: string[];
+  minSimilarityScore?: number;
+  includeDuplicateEvidence?: boolean;
+  includeSharedSource?: boolean;
+  includeSimilarStructure?: boolean;
+  includeCrimeChain?: boolean;
+  contentSimilarityThreshold?: number;
+  tagOverlapThreshold?: number;
+  structureOverlapThreshold?: number;
+}
+
+export interface CrossCaseComparisonResult {
+  totalCasesCompared: number;
+  caseIds: string[];
+  duplicateEvidenceGroups: DuplicateEvidenceGroup[];
+  sharedSourceGroups: SharedSourceGroup[];
+  similarStructureGroups: SimilarStructureGroup[];
+  crimeChainLinks: CrimeChainLink[];
+  overallScore: number;
+  summary: string;
+  recommendations: string[];
+  comparedAt: string;
+}

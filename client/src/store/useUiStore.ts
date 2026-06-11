@@ -16,6 +16,7 @@ interface UiState {
   investigationTaskPanelOpen: boolean;
   reportPanelOpen: boolean;
   anomalyAlertPanelOpen: boolean;
+  crossCaseComparisonPanelOpen: boolean;
   saveStatus: SaveStatus;
   lastSaved: Date | null;
   currentTime: string;
@@ -45,6 +46,8 @@ interface UiState {
   setReportPanelOpen: (open: boolean) => void;
   toggleAnomalyAlertPanel: () => void;
   setAnomalyAlertPanelOpen: (open: boolean) => void;
+  toggleCrossCaseComparisonPanel: () => void;
+  setCrossCaseComparisonPanelOpen: (open: boolean) => void;
   setSaveStatus: (status: SaveStatus) => void;
   updateLastSaved: () => void;
   updateCurrentTime: () => void;
@@ -65,6 +68,7 @@ export const useUiStore = create<UiState>((set) => ({
   investigationTaskPanelOpen: false,
   reportPanelOpen: false,
   anomalyAlertPanelOpen: false,
+  crossCaseComparisonPanelOpen: false,
   saveStatus: 'idle',
   lastSaved: null,
   currentTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
@@ -106,6 +110,9 @@ export const useUiStore = create<UiState>((set) => ({
 
   toggleAnomalyAlertPanel: () => set((state) => ({ anomalyAlertPanelOpen: !state.anomalyAlertPanelOpen })),
   setAnomalyAlertPanelOpen: (open) => set({ anomalyAlertPanelOpen: open }),
+
+  toggleCrossCaseComparisonPanel: () => set((state) => ({ crossCaseComparisonPanelOpen: !state.crossCaseComparisonPanelOpen })),
+  setCrossCaseComparisonPanelOpen: (open) => set({ crossCaseComparisonPanelOpen: open }),
 
   setSaveStatus: (status) => set({ saveStatus: status }),
 
