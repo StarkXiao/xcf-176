@@ -790,6 +790,18 @@ export interface RestoreEvidenceVersionDto {
   collaboratorName?: string | null;
 }
 
+export interface SkippedConnectionInfo {
+  connectionId: string;
+  reason: string;
+  otherEvidenceId: string;
+  otherEvidenceDeleted: boolean;
+}
+
+export interface RestoreFromRecycleBinResult {
+  evidence: Evidence | null;
+  skippedConnections: SkippedConnectionInfo[];
+}
+
 export interface VersionDiffResult {
   version: EvidenceVersion;
   fieldDiffs: FieldDiff[];

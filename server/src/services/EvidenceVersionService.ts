@@ -518,16 +518,31 @@ export const EvidenceVersionService = {
       const updateResult = EvidenceRepository.update(evidenceId, updateDto);
       restoredEvidence = updateResult ?? unarchived;
 
-      ConnectionRepository.restoreByEvidenceId(evidenceId);
+      const archiveResult = ConnectionRepository.restoreByEvidenceId(evidenceId);
 
       const diffFromSoftDelete = EvidenceVersionService.computeFieldDiffs(beforeForDiff, restoredEvidence);
       const fd = diffFromSoftDelete.fieldDiffs;
       const tc = diffFromSoftDelete.tagChanges;
-      // 立即记录恢复软删除版本并继续下面的关系同步
-      const syncNow = () => ({ fieldDiffs: fd, tagChanges: tc });
-      const synced = syncNow();
+      const synced = { fieldDiffs: fd, tagChanges: tc };
 
       const connectionChangesPre: RelationChange[] = [];
+      if (archiveResult.skipped.length > 0) {
+        for (const sc of archiveResult.skipped) {
+          const conn = ConnectionRepository.findByIdIncludeArchived(sc.connectionId);
+          if (conn) {
+            connectionChangesPre.push({
+              type: 'remove' as const,
+              connectionId: sc.connectionId,
+              fromEvidenceId: conn.fromEvidenceId,
+              toEvidenceId: conn.toEvidenceId,
+              oldLabel: `${conn.label}（跳过：${sc.reason}）`,
+              oldColor: conn.color,
+              oldLineStyle: conn.lineStyle,
+            });
+          }
+        }
+      }
+
       if (targetVersion.relatedConnectionsSnapshot) {
         const currentConnsMap = new Map<Connection['id'], Connection>();
         const allCurrentAfterRestore = ConnectionRepository.findByEvidenceId(evidenceId);
@@ -536,28 +551,41 @@ export const EvidenceVersionService = {
         const snapshotConnIds = new Set(targetVersion.relatedConnectionsSnapshot.map((c) => c.id));
 
         for (const [connId, sc] of snapshotConnsMap) {
-          if (!currentConnsMap.has(connId)) {
-            const fromExists = EvidenceRepository.findById(sc.fromEvidenceId);
-            const toExists = EvidenceRepository.findById(sc.toEvidenceId);
-            if (fromExists && toExists) {
-              ConnectionRepository.createWithId(connId, {
-                caseId: sc.caseId,
-                fromEvidenceId: sc.fromEvidenceId,
-                toEvidenceId: sc.toEvidenceId,
-                label: sc.label,
-                color: sc.color,
-                lineStyle: sc.lineStyle,
-              } as CreateConnectionDto);
+          const fromExists = EvidenceRepository.findById(sc.fromEvidenceId);
+          const toExists = EvidenceRepository.findById(sc.toEvidenceId);
+          if (!fromExists || !toExists) {
+            if (!currentConnsMap.has(connId)) {
               connectionChangesPre.push({
-                type: 'add',
+                type: 'remove' as const,
                 connectionId: connId,
                 fromEvidenceId: sc.fromEvidenceId,
                 toEvidenceId: sc.toEvidenceId,
-                newLabel: sc.label,
-                newColor: sc.color,
-                newLineStyle: sc.lineStyle,
+                oldLabel: `${sc.label}（跳过：另一端证据${!fromExists ? '已彻底删除' : '仍在回收站'}）`,
+                oldColor: sc.color,
+                oldLineStyle: sc.lineStyle,
               });
             }
+            continue;
+          }
+
+          if (!currentConnsMap.has(connId)) {
+            ConnectionRepository.createWithId(connId, {
+              caseId: sc.caseId,
+              fromEvidenceId: sc.fromEvidenceId,
+              toEvidenceId: sc.toEvidenceId,
+              label: sc.label,
+              color: sc.color,
+              lineStyle: sc.lineStyle,
+            } as CreateConnectionDto);
+            connectionChangesPre.push({
+              type: 'add',
+              connectionId: connId,
+              fromEvidenceId: sc.fromEvidenceId,
+              toEvidenceId: sc.toEvidenceId,
+              newLabel: sc.label,
+              newColor: sc.color,
+              newLineStyle: sc.lineStyle,
+            });
           } else {
             const cc = currentConnsMap.get(connId)!;
             const hasChange = cc.label !== sc.label || cc.color !== sc.color || cc.lineStyle !== sc.lineStyle;
@@ -600,11 +628,16 @@ export const EvidenceVersionService = {
       }
 
       const connectionsAfter = ConnectionRepository.findByEvidenceId(evidenceId);
+      let summary = `恢复到版本 v${targetVersion.versionNumber}（${targetVersion.createdAt.slice(0, 19).replace('T', ' ')}）`;
+      const totalSkipped = connectionChangesPre.filter(c => c.type === 'remove' && c.oldLabel?.includes('跳过')).length;
+      if (totalSkipped > 0) {
+        summary += `；跳过${totalSkipped}个连接（另一端证据未恢复）`;
+      }
       const restoreDto: CreateEvidenceVersionDto = {
         evidenceId: restoredEvidence.id,
         caseId: restoredEvidence.caseId,
         changeType: 'restore',
-        changeSummary: `恢复到版本 v${targetVersion.versionNumber}（${targetVersion.createdAt.slice(0, 19).replace('T', ' ')}）`,
+        changeSummary: summary,
         beforeState: existing ?? null,
         afterState: { ...restoredEvidence },
         fieldDiffs: synced.fieldDiffs,
@@ -662,28 +695,41 @@ export const EvidenceVersionService = {
       const snapshotConnIds = new Set(targetVersion.relatedConnectionsSnapshot.map((c) => c.id));
 
       for (const [connId, sc] of snapshotConnsMap) {
-        if (!currentConnsMap.has(connId)) {
-          const fromExists = EvidenceRepository.findById(sc.fromEvidenceId);
-          const toExists = EvidenceRepository.findById(sc.toEvidenceId);
-          if (fromExists && toExists) {
-            ConnectionRepository.createWithId(connId, {
-              caseId: sc.caseId,
-              fromEvidenceId: sc.fromEvidenceId,
-              toEvidenceId: sc.toEvidenceId,
-              label: sc.label,
-              color: sc.color,
-              lineStyle: sc.lineStyle,
-            } as CreateConnectionDto);
+        const fromExists = EvidenceRepository.findById(sc.fromEvidenceId);
+        const toExists = EvidenceRepository.findById(sc.toEvidenceId);
+        if (!fromExists || !toExists) {
+          if (!currentConnsMap.has(connId)) {
             connectionChanges.push({
-              type: 'add',
+              type: 'remove' as const,
               connectionId: connId,
               fromEvidenceId: sc.fromEvidenceId,
               toEvidenceId: sc.toEvidenceId,
-              newLabel: sc.label,
-              newColor: sc.color,
-              newLineStyle: sc.lineStyle,
+              oldLabel: `${sc.label}（跳过：另一端证据${!fromExists ? '已彻底删除' : '仍在回收站'}）`,
+              oldColor: sc.color,
+              oldLineStyle: sc.lineStyle,
             });
           }
+          continue;
+        }
+
+        if (!currentConnsMap.has(connId)) {
+          ConnectionRepository.createWithId(connId, {
+            caseId: sc.caseId,
+            fromEvidenceId: sc.fromEvidenceId,
+            toEvidenceId: sc.toEvidenceId,
+            label: sc.label,
+            color: sc.color,
+            lineStyle: sc.lineStyle,
+          } as CreateConnectionDto);
+          connectionChanges.push({
+            type: 'add',
+            connectionId: connId,
+            fromEvidenceId: sc.fromEvidenceId,
+            toEvidenceId: sc.toEvidenceId,
+            newLabel: sc.label,
+            newColor: sc.color,
+            newLineStyle: sc.lineStyle,
+          });
         } else {
           const cc = currentConnsMap.get(connId)!;
           const hasChange = cc.label !== sc.label || cc.color !== sc.color || cc.lineStyle !== sc.lineStyle;
@@ -726,12 +772,17 @@ export const EvidenceVersionService = {
     }
 
     const connectionsAfter = ConnectionRepository.findByEvidenceId(evidenceId);
+    let summary = `恢复到版本 v${targetVersion.versionNumber}（${targetVersion.createdAt.slice(0, 19).replace('T', ' ')}）`;
+    const totalSkipped = connectionChanges.filter(c => c.type === 'remove' && c.oldLabel?.includes('跳过')).length;
+    if (totalSkipped > 0) {
+      summary += `；跳过${totalSkipped}个连接（另一端证据未恢复）`;
+    }
 
     const restoreDto: CreateEvidenceVersionDto = {
       evidenceId: restoredEvidence.id,
       caseId: restoredEvidence.caseId,
       changeType: 'restore',
-      changeSummary: `恢复到版本 v${targetVersion.versionNumber}（${targetVersion.createdAt.slice(0, 19).replace('T', ' ')}）`,
+      changeSummary: summary,
       beforeState: existing ? { ...existing } : null,
       afterState: { ...restoredEvidence },
       fieldDiffs,
@@ -779,7 +830,11 @@ export const EvidenceVersionService = {
     restoredEvidence: Evidence,
     deletedInfo: Evidence & { deletedAt: string; deletedBy: string | null; deletedByName: string | null },
     collaboratorId: string | null,
-    collaboratorName: string | null
+    collaboratorName: string | null,
+    connectionRestoreResult?: {
+      restored: number;
+      skipped: Array<{ connectionId: string; reason: string; otherEvidenceId: string; otherEvidenceDeleted: boolean }>;
+    }
   ): EvidenceVersion => {
     const beforeState: Partial<Evidence> & { deletedAt?: string; deletedBy?: string | null; deletedByName?: string | null } = { ...deletedInfo };
     delete beforeState.deletedAt;
@@ -793,24 +848,48 @@ export const EvidenceVersionService = {
 
     const connections = ConnectionRepository.findByEvidenceId(restoredEvidence.id);
 
+    const relationChanges: RelationChange[] = connections.map(c => ({
+      type: 'add' as const,
+      connectionId: c.id,
+      fromEvidenceId: c.fromEvidenceId,
+      toEvidenceId: c.toEvidenceId,
+      newLabel: c.label,
+      newColor: c.color,
+      newLineStyle: c.lineStyle,
+    }));
+
+    if (connectionRestoreResult && connectionRestoreResult.skipped.length > 0) {
+      for (const sc of connectionRestoreResult.skipped) {
+        const conn = ConnectionRepository.findByIdIncludeArchived(sc.connectionId);
+        if (conn) {
+          relationChanges.push({
+            type: 'remove' as const,
+            connectionId: sc.connectionId,
+            fromEvidenceId: conn.fromEvidenceId,
+            toEvidenceId: conn.toEvidenceId,
+            oldLabel: `${conn.label}（跳过：${sc.reason}）`,
+            oldColor: conn.color,
+            oldLineStyle: conn.lineStyle,
+          });
+        }
+      }
+    }
+
+    let summary = `恢复已删除的证据（删除于${deletedInfo.deletedAt.slice(0, 19).replace('T', ' ')}，操作人: ${deletedInfo.deletedByName ?? deletedInfo.deletedBy ?? '(未知)'}）`;
+    if (connectionRestoreResult && connectionRestoreResult.skipped.length > 0) {
+      summary += `；跳过${connectionRestoreResult.skipped.length}个连接（另一端证据未恢复）`;
+    }
+
     const dto: CreateEvidenceVersionDto = {
       evidenceId: restoredEvidence.id,
       caseId: restoredEvidence.caseId,
       changeType: 'restore',
-      changeSummary: `恢复已删除的证据（删除于${deletedInfo.deletedAt.slice(0, 19).replace('T', ' ')}，操作人: ${deletedInfo.deletedByName ?? deletedInfo.deletedBy ?? '(未知)'}）`,
+      changeSummary: summary,
       beforeState: beforeState as Partial<Evidence>,
       afterState: { ...restoredEvidence },
       fieldDiffs,
       tagChanges,
-      relationChanges: connections.map(c => ({
-        type: 'add' as const,
-        connectionId: c.id,
-        fromEvidenceId: c.fromEvidenceId,
-        toEvidenceId: c.toEvidenceId,
-        newLabel: c.label,
-        newColor: c.color,
-        newLineStyle: c.lineStyle,
-      })),
+      relationChanges,
       relatedConnectionsSnapshot: connections,
       collaboratorId,
       collaboratorName,

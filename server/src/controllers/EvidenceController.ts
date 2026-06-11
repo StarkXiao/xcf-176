@@ -8,6 +8,7 @@ import type {
   SearchFilter,
   DeletedEvidenceInfo,
   Evidence,
+  RestoreFromRecycleBinResult,
 } from '@shared/types';
 
 interface EvidenceIdParams {
@@ -331,22 +332,27 @@ export const EvidenceController = {
     try {
       const { id } = req.params;
       const { collaboratorId, collaboratorName } = req.body;
-      const restored = EvidenceService.restoreDeletedEvidence(
+      const result = EvidenceService.restoreDeletedEvidence(
         id,
         collaboratorId ?? null,
         collaboratorName ?? null
       );
-      if (!restored) {
+      if (!result.evidence) {
         const response: ApiResponse<null> = {
           success: false,
           error: '恢复失败：该证据不在回收站中',
         };
         return reply.status(404).send(response);
       }
-      const response: ApiResponse<Evidence> = {
+
+      let message = '证据已从回收站恢复';
+      if (result.skippedConnections.length > 0) {
+        message += `，跳过${result.skippedConnections.length}个连接（另一端证据未恢复）`;
+      }
+      const response: ApiResponse<RestoreFromRecycleBinResult> = {
         success: true,
-        data: restored,
-        message: '证据已从回收站恢复',
+        data: result,
+        message,
       };
       return reply.send(response);
     } catch (error) {

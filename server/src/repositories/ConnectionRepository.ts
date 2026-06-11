@@ -71,13 +71,51 @@ export const ConnectionRepository = {
     return result.changes;
   },
 
-  restoreByEvidenceId: (evidenceId: string): number => {
-    const stmt = db.prepare(`
-      UPDATE connections SET archived_at = NULL
+  restoreByEvidenceId: (evidenceId: string): { restored: number; skipped: Array<{ connectionId: string; reason: string; otherEvidenceId: string; otherEvidenceDeleted: boolean }> } => {
+    const rows = db.prepare(`
+      SELECT * FROM connections 
       WHERE (from_evidence_id = ? OR to_evidence_id = ?) AND archived_at IS NOT NULL
-    `);
-    const result = stmt.run(evidenceId, evidenceId);
-    return result.changes;
+    `).all(evidenceId, evidenceId) as ConnectionRow[];
+
+    let restoredCount = 0;
+    const skipped: Array<{ connectionId: string; reason: string; otherEvidenceId: string; otherEvidenceDeleted: boolean }> = [];
+
+    for (const row of rows) {
+      const otherEvidenceId = row.from_evidence_id === evidenceId ? row.to_evidence_id : row.from_evidence_id;
+      const otherEvidence = db.prepare(
+        'SELECT deleted_at FROM evidence WHERE id = ?'
+      ).get(otherEvidenceId) as { deleted_at: string | null } | undefined;
+
+      if (!otherEvidence) {
+        skipped.push({
+          connectionId: row.id,
+          reason: '另一端证据已被彻底删除',
+          otherEvidenceId,
+          otherEvidenceDeleted: true,
+        });
+        continue;
+      }
+
+      if (otherEvidence.deleted_at !== null) {
+        skipped.push({
+          connectionId: row.id,
+          reason: '另一端证据仍在回收站中',
+          otherEvidenceId,
+          otherEvidenceDeleted: true,
+        });
+        continue;
+      }
+
+      const updateStmt = db.prepare(
+        'UPDATE connections SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL'
+      );
+      const result = updateStmt.run(row.id);
+      if (result.changes > 0) {
+        restoredCount++;
+      }
+    }
+
+    return { restored: restoredCount, skipped };
   },
 
   create: (dto: CreateConnectionDto): Connection => {

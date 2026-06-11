@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { Evidence, DeletedEvidenceInfo, CreateEvidenceDto, UpdateEvidenceDto, ApiResponse } from '@/types';
+import type { Evidence, DeletedEvidenceInfo, CreateEvidenceDto, UpdateEvidenceDto, ApiResponse, RestoreFromRecycleBinResult } from '@/types';
 
 export const evidenceApi = {
   async getByCaseId(caseId: string): Promise<ApiResponse<Evidence[]>> {
@@ -53,8 +53,8 @@ export const evidenceApi = {
     id: string,
     collaboratorId?: string,
     collaboratorName?: string
-  ): Promise<ApiResponse<Evidence>> {
-    return request<Evidence>(`/evidence/recycle-bin/${id}/restore`, {
+  ): Promise<ApiResponse<RestoreFromRecycleBinResult>> {
+    return request<RestoreFromRecycleBinResult>(`/evidence/recycle-bin/${id}/restore`, {
       method: 'POST',
       body: JSON.stringify({ collaboratorId, collaboratorName }),
     });

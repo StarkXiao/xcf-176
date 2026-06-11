@@ -124,20 +124,23 @@ export const EvidenceService = {
     id: string,
     collaboratorId?: string | null,
     collaboratorName?: string | null
-  ): Evidence | null => {
+  ): { evidence: Evidence | null; skippedConnections: Array<{ connectionId: string; reason: string; otherEvidenceId: string; otherEvidenceDeleted: boolean }> } => {
     const deletedInfo = EvidenceRepository.findDeletedById(id);
-    if (!deletedInfo) return null;
+    if (!deletedInfo) return { evidence: null, skippedConnections: [] };
 
     const restored = EvidenceRepository.restore(id);
+    let skippedConnections: Array<{ connectionId: string; reason: string; otherEvidenceId: string; otherEvidenceDeleted: boolean }> = [];
     if (restored) {
-      ConnectionRepository.restoreByEvidenceId(id);
+      const connResult = ConnectionRepository.restoreByEvidenceId(id);
+      skippedConnections = connResult.skipped;
 
       try {
         EvidenceVersionService._recordRestoreFromDelete(
           restored,
           deletedInfo,
           collaboratorId ?? null,
-          collaboratorName ?? null
+          collaboratorName ?? null,
+          connResult
         );
       } catch (_e) {
         // version logging should not break primary operation
@@ -145,7 +148,7 @@ export const EvidenceService = {
 
       AnomalyAlertService.runDetectionForCase(restored.caseId);
     }
-    return restored;
+    return { evidence: restored, skippedConnections };
   },
 
   purgeDeletedEvidence: (id: string): boolean => {
