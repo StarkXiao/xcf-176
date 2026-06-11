@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto, ApiResponse, CaseSearchFilters, CaseWithAggregatedData } from '@/types';
+import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto, ApiResponse, CaseSearchFilters, CaseWithAggregatedData, CaseOverview } from '@/types';
 
 export const caseApi = {
   async getAll(): Promise<ApiResponse<Case[]>> {
@@ -23,6 +23,10 @@ export const caseApi = {
 
   async getById(id: string): Promise<ApiResponse<CaseWithRelations>> {
     return request<CaseWithRelations>(`/cases/${id}/full`);
+  },
+
+  async getOverview(id: string): Promise<ApiResponse<CaseOverview>> {
+    return request<CaseOverview>(`/cases/${id}/overview`);
   },
 
   async create(data: CreateCaseDto): Promise<ApiResponse<Case>> {

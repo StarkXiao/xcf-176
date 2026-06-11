@@ -27,6 +27,7 @@ import {
   FileJson,
   FileCode,
   FileDown,
+  Activity,
 } from 'lucide-react';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -62,6 +63,7 @@ export const Toolbar: React.FC = () => {
   const toggleAnomalyAlertPanel = useUiStore((state) => state.toggleAnomalyAlertPanel);
   const toggleReportPanel = useUiStore((state) => state.toggleReportPanel);
   const toggleConnectionGroupPanel = useUiStore((state) => state.toggleConnectionGroupPanel);
+  const toggleOverviewPanel = useUiStore((state) => state.toggleOverviewPanel);
   const currentCollaboratorId = useUiStore((state) => state.currentCollaboratorId);
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const propertyPanelOpen = useUiStore((state) => state.propertyPanelOpen);
@@ -76,6 +78,7 @@ export const Toolbar: React.FC = () => {
   const anomalyAlertPanelOpen = useUiStore((state) => state.anomalyAlertPanelOpen);
   const reportPanelOpen = useUiStore((state) => state.reportPanelOpen);
   const connectionGroupPanelOpen = useUiStore((state) => state.connectionGroupPanelOpen);
+  const overviewPanelOpen = useUiStore((state) => state.overviewPanelOpen);
   const timelineMode = useCanvasStore((state) => state.timelineMode);
   const toggleTimelineMode = useCanvasStore((state) => state.toggleTimelineMode);
   const canvasZoom = useCanvasStore((state) => state.zoom);
@@ -523,6 +526,16 @@ export const Toolbar: React.FC = () => {
           glow={connectionGroupPanelOpen}
           title="关系连线分组管理"
         />
+        <NeonButton
+          size="sm"
+          variant="success"
+          icon={<Activity size={16} />}
+          onClick={toggleOverviewPanel}
+          glow={overviewPanelOpen}
+          title="案件概览"
+        >
+          概览
+        </NeonButton>
         <NeonButton
           size="sm"
           variant="primary"

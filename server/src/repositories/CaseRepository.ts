@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import db from '../database/index.js';
-import type { Case, CreateCaseDto, UpdateCaseDto, CanvasState, CaseTemplate, CaseSearchFilters, CaseWithAggregatedData, Evidence } from '@shared/types';
+import type { Case, CreateCaseDto, UpdateCaseDto, CanvasState, CaseTemplate, CaseSearchFilters, CaseWithAggregatedData, Evidence, CaseOverview, EvidenceCountByImportance, TagDistribution, RecentChange, AuditAction } from '@shared/types';
 
 interface CaseRow {
   id: string;
@@ -244,5 +244,83 @@ export const CaseRepository = {
       'SELECT DISTINCT source FROM evidence WHERE deleted_at IS NULL AND source IS NOT NULL AND source != \'unknown\''
     ).all() as Array<{ source: string }>;
     return rows.map((r) => r.source).filter(Boolean).sort();
+  },
+
+  getCaseOverview: (caseId: string): CaseOverview | null => {
+    const caseData = CaseRepository.findById(caseId);
+    if (!caseData) return null;
+
+    const evidenceRows = db.prepare(
+      'SELECT importance, tags FROM evidence WHERE case_id = ? AND deleted_at IS NULL'
+    ).all(caseId) as Array<{ importance: string; tags: string }>;
+
+    const totalEvidence = evidenceRows.length;
+    const evidenceByImportance: EvidenceCountByImportance = { low: 0, normal: 0, high: 0, critical: 0 };
+    const tagCountMap = new Map<string, number>();
+
+    for (const row of evidenceRows) {
+      const imp = row.importance as keyof EvidenceCountByImportance;
+      if (imp in evidenceByImportance) {
+        evidenceByImportance[imp]++;
+      }
+      try {
+        const tags = JSON.parse(row.tags) as string[];
+        for (const tag of tags) {
+          tagCountMap.set(tag, (tagCountMap.get(tag) || 0) + 1);
+        }
+      } catch {
+        // skip invalid JSON
+      }
+    }
+
+    const tagDistribution: TagDistribution[] = Array.from(tagCountMap.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
+
+    const totalConnections = (db.prepare(
+      'SELECT COUNT(*) as count FROM connections WHERE case_id = ? AND archived_at IS NULL'
+    ).get(caseId) as { count: number }).count;
+
+    const totalCollaborators = (db.prepare(
+      'SELECT COUNT(*) as count FROM collaborators WHERE case_id = ?'
+    ).get(caseId) as { count: number }).count;
+
+    const auditRows = db.prepare(`
+      SELECT id, action, target_type, target_id, detail, collaborator_name, created_at
+      FROM audit_logs
+      WHERE case_id = ?
+      ORDER BY created_at DESC
+      LIMIT 10
+    `).all(caseId) as Array<{
+      id: string;
+      action: string;
+      target_type: string;
+      target_id: string;
+      detail: string;
+      collaborator_name: string;
+      created_at: string;
+    }>;
+
+    const recentChanges: RecentChange[] = auditRows.map((row) => ({
+      id: row.id,
+      action: row.action as AuditAction,
+      targetType: row.target_type as RecentChange['targetType'],
+      targetId: row.target_id,
+      detail: row.detail,
+      collaboratorName: row.collaborator_name,
+      createdAt: row.created_at,
+    }));
+
+    return {
+      caseId,
+      totalEvidence,
+      totalConnections,
+      totalCollaborators,
+      evidenceByImportance,
+      tagDistribution,
+      recentChanges,
+      lastUpdatedAt: caseData.updatedAt,
+    };
   },
 };

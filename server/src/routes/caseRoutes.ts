@@ -8,6 +8,7 @@ export const caseRoutes = async (fastify: FastifyInstance) => {
   fastify.post('/search', CaseController.searchCases);
   fastify.get('/:id', CaseController.getCaseById);
   fastify.get('/:id/full', CaseController.getCaseWithRelations);
+  fastify.get('/:id/overview', CaseController.getCaseOverview);
   fastify.post('/', CaseController.createCase);
   fastify.put('/:id', CaseController.updateCase);
   fastify.put('/:id/canvas', CaseController.saveCanvasState);

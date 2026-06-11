@@ -1080,3 +1080,36 @@ export interface UpdateCaseSnapshotDto {
   description?: string;
   relationshipNotes?: CaseSnapshotRelationshipNote[];
 }
+
+export interface EvidenceCountByImportance {
+  low: number;
+  normal: number;
+  high: number;
+  critical: number;
+}
+
+export interface TagDistribution {
+  tag: string;
+  count: number;
+}
+
+export interface RecentChange {
+  id: string;
+  action: AuditAction;
+  targetType: 'evidence' | 'connection' | 'case' | 'collaborator';
+  targetId: string;
+  detail: string;
+  collaboratorName: string;
+  createdAt: string;
+}
+
+export interface CaseOverview {
+  caseId: string;
+  totalEvidence: number;
+  totalConnections: number;
+  totalCollaborators: number;
+  evidenceByImportance: EvidenceCountByImportance;
+  tagDistribution: TagDistribution[];
+  recentChanges: RecentChange[];
+  lastUpdatedAt: string;
+}

@@ -16,6 +16,7 @@ import { AnomalyAlertPanel } from '@/components/AnomalyAlertPanel';
 import { ReportPanel } from '@/components/ReportPanel';
 import { CrossCaseComparisonPanel } from '@/components/CrossCaseComparisonPanel';
 import { ConnectionGroupPanel } from '@/components/ConnectionGroupPanel';
+import { CaseOverviewPanel } from '@/components/CaseOverviewPanel';
 import { ScanlineEffect } from '@/components/ui/ScanlineEffect';
 import { useUiStore } from '@/store/useUiStore';
 import { useCaseStore } from '@/store/useCaseStore';
@@ -163,6 +164,7 @@ const Home: React.FC = () => {
         {reportPanelOpen && <ReportPanel />}
         {crossCaseComparisonPanelOpen && <CrossCaseComparisonPanel />}
         {connectionGroupPanelOpen && <ConnectionGroupPanel />}
+        <CaseOverviewPanel />
         <PropertyPanel />
       </div>
 

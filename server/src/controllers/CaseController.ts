@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { CaseService } from '../services/CaseService.js';
 import { PersistenceService } from '../services/PersistenceService.js';
-import type { Case, CreateCaseDto, UpdateCaseDto, ApiResponse, CaseWithRelations, CaseSearchFilters, CaseWithAggregatedData } from '@shared/types';
+import type { Case, CreateCaseDto, UpdateCaseDto, ApiResponse, CaseWithRelations, CaseSearchFilters, CaseWithAggregatedData, CaseOverview } from '@shared/types';
 
 interface CaseIdParams {
   Params: { id: string };
@@ -125,6 +125,33 @@ export const CaseController = {
       const response: ApiResponse<CaseWithRelations> = {
         success: true,
         data: caseData,
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async getCaseOverview(req: FastifyRequest<CaseIdParams>, reply: FastifyReply) {
+    try {
+      const { id } = req.params;
+      const overview = CaseService.getCaseOverview(id);
+
+      if (!overview) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: '案件不存在',
+        };
+        return reply.status(404).send(response);
+      }
+
+      const response: ApiResponse<CaseOverview> = {
+        success: true,
+        data: overview,
       };
       return reply.send(response);
     } catch (error) {

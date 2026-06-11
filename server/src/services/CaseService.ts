@@ -4,7 +4,7 @@ import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
 import { CollaboratorRepository } from '../repositories/CollaboratorRepository.js';
 import { AnomalyAlertRepository } from '../repositories/AnomalyAlertRepository.js';
 import { AnomalyAlertService } from './AnomalyAlertService.js';
-import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto, CaseSearchFilters, CaseWithAggregatedData } from '@shared/types';
+import type { Case, CaseWithRelations, CreateCaseDto, UpdateCaseDto, CaseSearchFilters, CaseWithAggregatedData, CaseOverview } from '@shared/types';
 
 export const CaseService = {
   getAllCases: (): Case[] => {
@@ -64,5 +64,9 @@ export const CaseService = {
 
   getAvailableCaseSources: (): string[] => {
     return CaseRepository.getAllAvailableSources();
+  },
+
+  getCaseOverview: (caseId: string): CaseOverview | null => {
+    return CaseRepository.getCaseOverview(caseId);
   },
 };
