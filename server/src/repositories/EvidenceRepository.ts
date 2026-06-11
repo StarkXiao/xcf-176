@@ -18,6 +18,9 @@ interface EvidenceRow {
   assigned_to: string | null;
   status: string;
   created_at: string;
+  deleted_at: string | null;
+  deleted_by: string | null;
+  deleted_by_name: string | null;
 }
 
 const rowToEvidence = (row: EvidenceRow): Evidence => ({
@@ -38,20 +41,83 @@ const rowToEvidence = (row: EvidenceRow): Evidence => ({
   createdAt: row.created_at,
 });
 
+export interface DeletedEvidenceInfo extends Evidence {
+  deletedAt: string;
+  deletedBy: string | null;
+  deletedByName: string | null;
+}
+
+const rowToDeletedEvidence = (row: EvidenceRow): DeletedEvidenceInfo => ({
+  ...rowToEvidence(row),
+  deletedAt: row.deleted_at!,
+  deletedBy: row.deleted_by,
+  deletedByName: row.deleted_by_name,
+});
+
 export const EvidenceRepository = {
   findAll: (): Evidence[] => {
+    const rows = db.prepare(
+      'SELECT * FROM evidence WHERE deleted_at IS NULL ORDER BY created_at DESC'
+    ).all() as EvidenceRow[];
+    return rows.map(rowToEvidence);
+  },
+
+  findAllIncludeDeleted: (): Evidence[] => {
     const rows = db.prepare('SELECT * FROM evidence ORDER BY created_at DESC').all() as EvidenceRow[];
     return rows.map(rowToEvidence);
   },
 
   findById: (id: string): Evidence | null => {
+    const row = db.prepare(
+      'SELECT * FROM evidence WHERE id = ? AND deleted_at IS NULL'
+    ).get(id) as EvidenceRow | undefined;
+    return row ? rowToEvidence(row) : null;
+  },
+
+  findByIdIncludeDeleted: (id: string): Evidence | null => {
     const row = db.prepare('SELECT * FROM evidence WHERE id = ?').get(id) as EvidenceRow | undefined;
     return row ? rowToEvidence(row) : null;
   },
 
+  findDeletedById: (id: string): DeletedEvidenceInfo | null => {
+    const row = db.prepare(
+      'SELECT * FROM evidence WHERE id = ? AND deleted_at IS NOT NULL'
+    ).get(id) as EvidenceRow | undefined;
+    return row ? rowToDeletedEvidence(row) : null;
+  },
+
+  findAllDeleted: (): DeletedEvidenceInfo[] => {
+    const rows = db.prepare(
+      'SELECT * FROM evidence WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC'
+    ).all() as EvidenceRow[];
+    return rows.map(rowToDeletedEvidence);
+  },
+
+  findDeletedByCaseId: (caseId: string): DeletedEvidenceInfo[] => {
+    const rows = db.prepare(
+      'SELECT * FROM evidence WHERE case_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC'
+    ).all(caseId) as EvidenceRow[];
+    return rows.map(rowToDeletedEvidence);
+  },
+
+  findDeletedByCollaborator: (collaboratorId: string): DeletedEvidenceInfo[] => {
+    const rows = db.prepare(
+      'SELECT * FROM evidence WHERE deleted_by = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC'
+    ).all(collaboratorId) as EvidenceRow[];
+    return rows.map(rowToDeletedEvidence);
+  },
+
   findByCaseId: (caseId: string): Evidence[] => {
-    const rows = db.prepare('SELECT * FROM evidence WHERE case_id = ? ORDER BY created_at ASC')
-      .all(caseId) as EvidenceRow[];
+    const rows = db.prepare(
+      'SELECT * FROM evidence WHERE case_id = ? AND deleted_at IS NULL ORDER BY created_at ASC'
+    ).all(caseId) as EvidenceRow[];
+    return rows.map(rowToEvidence);
+  },
+
+  findByCaseIdIncludeDeleted: (caseId: string): Evidence[] => {
+    const rows = db.prepare(
+      'SELECT * FROM evidence WHERE case_id = ? ORDER BY created_at ASC'
+    ).all(caseId) as EvidenceRow[];
     return rows.map(rowToEvidence);
   },
 
@@ -70,8 +136,8 @@ export const EvidenceRepository = {
       INSERT INTO evidence (
         id, case_id, content, source, importance, tags,
         position_x, position_y, width, height, color, timestamp,
-        assigned_to, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        assigned_to, status, created_at, deleted_at, deleted_by, deleted_by_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
     `);
     stmt.run(
       id,
@@ -90,11 +156,11 @@ export const EvidenceRepository = {
       dto.status ?? 'pending',
       now
     );
-    return EvidenceRepository.findById(id)!;
+    return EvidenceRepository.findByIdIncludeDeleted(id)!;
   },
 
   update: (id: string, dto: UpdateEvidenceDto): Evidence | null => {
-    const existing = EvidenceRepository.findById(id);
+    const existing = EvidenceRepository.findByIdIncludeDeleted(id);
     if (!existing) return null;
 
     const fields: string[] = [];
@@ -158,15 +224,73 @@ export const EvidenceRepository = {
     return EvidenceRepository.findById(id);
   },
 
+  softDelete: (
+    id: string,
+    collaboratorId?: string | null,
+    collaboratorName?: string | null
+  ): boolean => {
+    const existing = EvidenceRepository.findById(id);
+    if (!existing) return false;
+    const now = new Date().toISOString();
+    const stmt = db.prepare(
+      'UPDATE evidence SET deleted_at = ?, deleted_by = ?, deleted_by_name = ? WHERE id = ? AND deleted_at IS NULL'
+    );
+    const result = stmt.run(
+      now,
+      collaboratorId ?? null,
+      collaboratorName ?? null,
+      id
+    );
+    return result.changes > 0;
+  },
+
+  restore: (id: string): Evidence | null => {
+    const existing = EvidenceRepository.findDeletedById(id);
+    if (!existing) return null;
+    const stmt = db.prepare(
+      'UPDATE evidence SET deleted_at = NULL, deleted_by = NULL, deleted_by_name = NULL WHERE id = ? AND deleted_at IS NOT NULL'
+    );
+    const result = stmt.run(id);
+    if (result.changes > 0) {
+      return EvidenceRepository.findById(id);
+    }
+    return null;
+  },
+
   delete: (id: string): boolean => {
     const stmt = db.prepare('DELETE FROM evidence WHERE id = ?');
     const result = stmt.run(id);
     return result.changes > 0;
   },
 
+  purgeDeletedOlderThan: (days: number): number => {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const stmt = db.prepare('DELETE FROM evidence WHERE deleted_at IS NOT NULL AND deleted_at < ?');
+    const result = stmt.run(cutoff);
+    return result.changes;
+  },
+
   deleteByCaseId: (caseId: string): number => {
     const stmt = db.prepare('DELETE FROM evidence WHERE case_id = ?');
     const result = stmt.run(caseId);
+    return result.changes;
+  },
+
+  softDeleteByCaseId: (
+    caseId: string,
+    collaboratorId?: string | null,
+    collaboratorName?: string | null
+  ): number => {
+    const now = new Date().toISOString();
+    const stmt = db.prepare(
+      'UPDATE evidence SET deleted_at = ?, deleted_by = ?, deleted_by_name = ? WHERE case_id = ? AND deleted_at IS NULL'
+    );
+    const result = stmt.run(
+      now,
+      collaboratorId ?? null,
+      collaboratorName ?? null,
+      caseId
+    );
     return result.changes;
   },
 };

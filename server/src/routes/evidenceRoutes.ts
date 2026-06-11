@@ -12,4 +12,11 @@ export const evidenceRoutes = async (fastify: FastifyInstance) => {
   fastify.put('/:id/position', EvidenceController.updatePosition);
   fastify.put('/:id/size', EvidenceController.updateSize);
   fastify.delete('/:id', EvidenceController.deleteEvidence);
+
+  fastify.get('/recycle-bin/all', EvidenceController.getAllDeletedEvidence);
+  fastify.get('/recycle-bin/case/:caseId', EvidenceController.getDeletedByCaseId);
+  fastify.get('/recycle-bin/:id', EvidenceController.getDeletedById);
+  fastify.post('/recycle-bin/:id/restore', EvidenceController.restoreDeletedEvidence);
+  fastify.delete('/recycle-bin/:id/purge', EvidenceController.purgeDeletedEvidence);
+  fastify.post('/recycle-bin/purge-all', EvidenceController.purgeAllDeleted);
 };

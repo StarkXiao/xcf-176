@@ -50,8 +50,13 @@ const createTables = () => {
       assigned_to TEXT DEFAULT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      deleted_at TEXT,
+      deleted_by TEXT,
+      deleted_by_name TEXT,
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
     );
+
+    CREATE INDEX IF NOT EXISTS idx_evidence_deleted_at ON evidence(deleted_at);
 
     CREATE TABLE IF NOT EXISTS connections (
       id TEXT PRIMARY KEY,
@@ -62,10 +67,13 @@ const createTables = () => {
       color TEXT DEFAULT '#6b7280',
       line_style TEXT NOT NULL DEFAULT 'solid',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      archived_at TEXT,
       FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
-      FOREIGN KEY (from_evidence_id) REFERENCES evidence(id) ON DELETE CASCADE,
-      FOREIGN KEY (to_evidence_id) REFERENCES evidence(id) ON DELETE CASCADE
+      FOREIGN KEY (from_evidence_id) REFERENCES evidence(id),
+      FOREIGN KEY (to_evidence_id) REFERENCES evidence(id)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_connections_archived_at ON connections(archived_at);
 
     CREATE TABLE IF NOT EXISTS collaborators (
       id TEXT PRIMARY KEY,
@@ -383,6 +391,61 @@ const runMigrations = () => {
       transaction();
       db.pragma('foreign_keys = ON');
     }
+  }
+
+  const evColumns = db.prepare("PRAGMA table_info(evidence)").all() as { name: string }[];
+  const evColumnNames = evColumns.map(c => c.name);
+  if (!evColumnNames.includes('deleted_at')) {
+    db.exec('ALTER TABLE evidence ADD COLUMN deleted_at TEXT');
+  }
+  if (!evColumnNames.includes('deleted_by')) {
+    db.exec('ALTER TABLE evidence ADD COLUMN deleted_by TEXT');
+  }
+  if (!evColumnNames.includes('deleted_by_name')) {
+    db.exec('ALTER TABLE evidence ADD COLUMN deleted_by_name TEXT');
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_deleted_at ON evidence(deleted_at);');
+
+  const connColumns = db.prepare("PRAGMA table_info(connections)").all() as { name: string }[];
+  const connColumnNames = connColumns.map(c => c.name);
+  if (!connColumnNames.includes('archived_at')) {
+    db.exec('ALTER TABLE connections ADD COLUMN archived_at TEXT');
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_connections_archived_at ON connections(archived_at);');
+
+  const connFkList = db.prepare("PRAGMA foreign_key_list(connections)").all() as Array<{ id: number; table: string; from: string; to: string; on_delete: string }>;
+  const fromFk = connFkList.find(fk => fk.from === 'from_evidence_id');
+  const toFk = connFkList.find(fk => fk.from === 'to_evidence_id');
+  const connNeedRebuild = (fromFk && fromFk.on_delete === 'CASCADE') || (toFk && toFk.on_delete === 'CASCADE');
+  if (connNeedRebuild) {
+    db.pragma('foreign_keys = OFF');
+    const transaction = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE connections_new (
+          id TEXT PRIMARY KEY,
+          case_id TEXT NOT NULL,
+          from_evidence_id TEXT NOT NULL,
+          to_evidence_id TEXT NOT NULL,
+          label TEXT,
+          color TEXT DEFAULT '#6b7280',
+          line_style TEXT NOT NULL DEFAULT 'solid',
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          archived_at TEXT,
+          FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+          FOREIGN KEY (from_evidence_id) REFERENCES evidence(id),
+          FOREIGN KEY (to_evidence_id) REFERENCES evidence(id)
+        );
+      `);
+      db.exec(`INSERT INTO connections_new (id, case_id, from_evidence_id, to_evidence_id, label, color, line_style, created_at, archived_at) SELECT id, case_id, from_evidence_id, to_evidence_id, label, color, line_style, created_at, archived_at FROM connections;`);
+      db.exec('DROP TABLE connections;');
+      db.exec('ALTER TABLE connections_new RENAME TO connections;');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_connections_case_id ON connections(case_id);');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_connections_from ON connections(from_evidence_id);');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_connections_to ON connections(to_evidence_id);');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_connections_archived_at ON connections(archived_at);');
+    });
+    transaction();
+    db.pragma('foreign_keys = ON');
   }
 };
 

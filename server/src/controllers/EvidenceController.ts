@@ -1,7 +1,14 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { EvidenceService } from '../services/EvidenceService.js';
 import { PersistenceService } from '../services/PersistenceService.js';
-import type { CreateEvidenceDto, UpdateEvidenceDto, ApiResponse, SearchFilter } from '@shared/types';
+import type {
+  CreateEvidenceDto,
+  UpdateEvidenceDto,
+  ApiResponse,
+  SearchFilter,
+  DeletedEvidenceInfo,
+  Evidence,
+} from '@shared/types';
 
 interface EvidenceIdParams {
   Params: { id: string };
@@ -248,7 +255,142 @@ export const EvidenceController = {
 
       const response: ApiResponse<null> = {
         success: true,
-        message: '证据删除成功',
+        message: '证据已移至回收站，版本历史已保留',
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async getAllDeletedEvidence(_req: FastifyRequest, reply: FastifyReply) {
+    try {
+      const deleted = EvidenceService.getAllDeletedEvidence();
+      const response: ApiResponse<DeletedEvidenceInfo[]> = {
+        success: true,
+        data: deleted,
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async getDeletedByCaseId(req: FastifyRequest<CaseIdParams>, reply: FastifyReply) {
+    try {
+      const { caseId } = req.params;
+      const deleted = EvidenceService.getDeletedEvidenceByCaseId(caseId);
+      const response: ApiResponse<DeletedEvidenceInfo[]> = {
+        success: true,
+        data: deleted,
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async getDeletedById(req: FastifyRequest<EvidenceIdParams>, reply: FastifyReply) {
+    try {
+      const { id } = req.params;
+      const deleted = EvidenceService.getDeletedEvidenceById(id);
+      if (!deleted) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: '该证据不在回收站中',
+        };
+        return reply.status(404).send(response);
+      }
+      const response: ApiResponse<DeletedEvidenceInfo> = {
+        success: true,
+        data: deleted,
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async restoreDeletedEvidence(req: FastifyRequest<EvidenceIdParams & { Body: { collaboratorId?: string; collaboratorName?: string } }>, reply: FastifyReply) {
+    try {
+      const { id } = req.params;
+      const { collaboratorId, collaboratorName } = req.body;
+      const restored = EvidenceService.restoreDeletedEvidence(
+        id,
+        collaboratorId ?? null,
+        collaboratorName ?? null
+      );
+      if (!restored) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: '恢复失败：该证据不在回收站中',
+        };
+        return reply.status(404).send(response);
+      }
+      const response: ApiResponse<Evidence> = {
+        success: true,
+        data: restored,
+        message: '证据已从回收站恢复',
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async purgeDeletedEvidence(req: FastifyRequest<EvidenceIdParams>, reply: FastifyReply) {
+    try {
+      const { id } = req.params;
+      const purged = EvidenceService.purgeDeletedEvidence(id);
+      if (!purged) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: '彻底清除失败：该证据不在回收站中',
+        };
+        return reply.status(404).send(response);
+      }
+      const response: ApiResponse<null> = {
+        success: true,
+        message: '证据及其版本历史已被彻底清除（不可恢复）',
+      };
+      return reply.send(response);
+    } catch (error) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: (error as Error).message,
+      };
+      return reply.status(500).send(response);
+    }
+  },
+
+  async purgeAllDeleted(req: FastifyRequest<{ Body: { days?: number } }>, reply: FastifyReply) {
+    try {
+      const { days } = req.body;
+      const result = EvidenceService.purgeAllDeleted(days);
+      const response: ApiResponse<typeof result> = {
+        success: true,
+        data: result,
+        message: `已彻底清除 ${result.purgedEvidenceCount} 条回收站证据${days !== undefined ? `（早于 ${days} 天）` : ''}`,
       };
       return reply.send(response);
     } catch (error) {

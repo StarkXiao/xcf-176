@@ -11,6 +11,7 @@ interface ConnectionRow {
   color: string;
   line_style: string;
   created_at: string;
+  archived_at: string | null;
 }
 
 const rowToConnection = (row: ConnectionRow): Connection => ({
@@ -26,28 +27,57 @@ const rowToConnection = (row: ConnectionRow): Connection => ({
 
 export const ConnectionRepository = {
   findAll: (): Connection[] => {
-    const rows = db.prepare('SELECT * FROM connections ORDER BY created_at DESC').all() as ConnectionRow[];
+    const rows = db.prepare(
+      'SELECT * FROM connections WHERE archived_at IS NULL ORDER BY created_at DESC'
+    ).all() as ConnectionRow[];
     return rows.map(rowToConnection);
   },
 
   findById: (id: string): Connection | null => {
+    const row = db.prepare(
+      'SELECT * FROM connections WHERE id = ? AND archived_at IS NULL'
+    ).get(id) as ConnectionRow | undefined;
+    return row ? rowToConnection(row) : null;
+  },
+
+  findByIdIncludeArchived: (id: string): Connection | null => {
     const row = db.prepare('SELECT * FROM connections WHERE id = ?').get(id) as ConnectionRow | undefined;
     return row ? rowToConnection(row) : null;
   },
 
   findByCaseId: (caseId: string): Connection[] => {
-    const rows = db.prepare('SELECT * FROM connections WHERE case_id = ? ORDER BY created_at ASC')
-      .all(caseId) as ConnectionRow[];
+    const rows = db.prepare(
+      'SELECT * FROM connections WHERE case_id = ? AND archived_at IS NULL ORDER BY created_at ASC'
+    ).all(caseId) as ConnectionRow[];
     return rows.map(rowToConnection);
   },
 
   findByEvidenceId: (evidenceId: string): Connection[] => {
     const rows = db.prepare(`
       SELECT * FROM connections 
-      WHERE from_evidence_id = ? OR to_evidence_id = ? 
+      WHERE (from_evidence_id = ? OR to_evidence_id = ?) AND archived_at IS NULL
       ORDER BY created_at ASC
     `).all(evidenceId, evidenceId) as ConnectionRow[];
     return rows.map(rowToConnection);
+  },
+
+  archiveByEvidenceId: (evidenceId: string): number => {
+    const now = new Date().toISOString();
+    const stmt = db.prepare(`
+      UPDATE connections SET archived_at = ?
+      WHERE (from_evidence_id = ? OR to_evidence_id = ?) AND archived_at IS NULL
+    `);
+    const result = stmt.run(now, evidenceId, evidenceId);
+    return result.changes;
+  },
+
+  restoreByEvidenceId: (evidenceId: string): number => {
+    const stmt = db.prepare(`
+      UPDATE connections SET archived_at = NULL
+      WHERE (from_evidence_id = ? OR to_evidence_id = ?) AND archived_at IS NOT NULL
+    `);
+    const result = stmt.run(evidenceId, evidenceId);
+    return result.changes;
   },
 
   create: (dto: CreateConnectionDto): Connection => {
@@ -64,8 +94,8 @@ export const ConnectionRepository = {
     const stmt = db.prepare(`
       INSERT INTO connections (
         id, case_id, from_evidence_id, to_evidence_id,
-        label, color, line_style, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        label, color, line_style, created_at, archived_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
     `);
     stmt.run(
       id,
@@ -77,7 +107,27 @@ export const ConnectionRepository = {
       dto.lineStyle ?? 'solid',
       now
     );
-    return ConnectionRepository.findById(id)!;
+    return ConnectionRepository.findByIdIncludeArchived(id)!;
+  },
+
+  archive: (id: string): boolean => {
+    const now = new Date().toISOString();
+    const stmt = db.prepare(
+      'UPDATE connections SET archived_at = ? WHERE id = ? AND archived_at IS NULL'
+    );
+    const result = stmt.run(now, id);
+    return result.changes > 0;
+  },
+
+  unarchive: (id: string): Connection | null => {
+    const stmt = db.prepare(
+      'UPDATE connections SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL'
+    );
+    const result = stmt.run(id);
+    if (result.changes > 0) {
+      return ConnectionRepository.findById(id);
+    }
+    return null;
   },
 
   delete: (id: string): boolean => {
@@ -87,7 +137,7 @@ export const ConnectionRepository = {
   },
 
   update: (id: string, dto: Partial<Pick<Connection, 'label' | 'color' | 'lineStyle'>>): Connection | null => {
-    const existing = ConnectionRepository.findById(id);
+    const existing = ConnectionRepository.findByIdIncludeArchived(id);
     if (!existing) return null;
 
     const fields: string[] = [];

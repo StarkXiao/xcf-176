@@ -1,5 +1,6 @@
-import { EvidenceRepository } from '../repositories/EvidenceRepository.js';
+import { EvidenceRepository, type DeletedEvidenceInfo } from '../repositories/EvidenceRepository.js';
 import { ConnectionRepository } from '../repositories/ConnectionRepository.js';
+import { EvidenceVersionRepository } from '../repositories/EvidenceVersionRepository.js';
 import { InvestigationTaskService } from './InvestigationTaskService.js';
 import { AnomalyAlertService } from './AnomalyAlertService.js';
 import { EvidenceVersionService } from './EvidenceVersionService.js';
@@ -101,19 +102,89 @@ export const EvidenceService = {
   deleteEvidence: (id: string, collaboratorId?: string | null, collaboratorName?: string | null): boolean => {
     const existing = EvidenceRepository.findById(id);
     const caseId = existing?.caseId;
+    let deleted = false;
     if (existing) {
       try {
         EvidenceVersionService.recordEvidenceDelete(existing, collaboratorId ?? null, collaboratorName ?? null);
       } catch (_e) {
         // version logging should not break primary operation
       }
+      deleted = EvidenceRepository.softDelete(id, collaboratorId ?? null, collaboratorName ?? null);
+      if (deleted) {
+        ConnectionRepository.archiveByEvidenceId(id);
+      }
     }
-    ConnectionRepository.deleteByEvidenceId(id);
-    const deleted = EvidenceRepository.delete(id);
     if (deleted && caseId) {
       AnomalyAlertService.runDetectionForCase(caseId);
     }
     return deleted;
+  },
+
+  restoreDeletedEvidence: (
+    id: string,
+    collaboratorId?: string | null,
+    collaboratorName?: string | null
+  ): Evidence | null => {
+    const deletedInfo = EvidenceRepository.findDeletedById(id);
+    if (!deletedInfo) return null;
+
+    const restored = EvidenceRepository.restore(id);
+    if (restored) {
+      ConnectionRepository.restoreByEvidenceId(id);
+
+      try {
+        EvidenceVersionService._recordRestoreFromDelete(
+          restored,
+          deletedInfo,
+          collaboratorId ?? null,
+          collaboratorName ?? null
+        );
+      } catch (_e) {
+        // version logging should not break primary operation
+      }
+
+      AnomalyAlertService.runDetectionForCase(restored.caseId);
+    }
+    return restored;
+  },
+
+  purgeDeletedEvidence: (id: string): boolean => {
+    const deletedInfo = EvidenceRepository.findDeletedById(id);
+    if (!deletedInfo) return false;
+    ConnectionRepository.deleteByEvidenceId(id);
+    EvidenceVersionRepository.deleteByEvidenceId(id);
+    return EvidenceRepository.delete(id);
+  },
+
+  purgeAllDeleted: (days?: number): { purgedEvidenceCount: number } => {
+    let count = 0;
+    const toPurge = days !== undefined
+      ? EvidenceRepository.findAllDeleted().filter(d => {
+          const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+          return new Date(d.deletedAt).getTime() < cutoff;
+        })
+      : EvidenceRepository.findAllDeleted();
+
+    for (const d of toPurge) {
+      ConnectionRepository.deleteByEvidenceId(d.id);
+      EvidenceVersionRepository.deleteByEvidenceId(d.id);
+      if (EvidenceRepository.delete(d.id)) {
+        count++;
+      }
+    }
+    return { purgedEvidenceCount: count };
+  },
+
+  getAllDeletedEvidence: (): DeletedEvidenceInfo[] => {
+    return EvidenceRepository.findAllDeleted();
+  },
+
+  getDeletedEvidenceByCaseId: (caseId: string): DeletedEvidenceInfo[] => {
+    return EvidenceRepository.findDeletedByCaseId(caseId);
+  },
+
+  getDeletedEvidenceById: (id: string): DeletedEvidenceInfo | null => {
+    return EvidenceRepository.findDeletedById(id);
   },
 
   getAllTags: (caseId: string): string[] => {

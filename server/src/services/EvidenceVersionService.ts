@@ -489,9 +489,135 @@ export const EvidenceVersionService = {
     }
 
     const existing = EvidenceRepository.findById(evidenceId);
+    const existingIncludeDeleted = EvidenceRepository.findByIdIncludeDeleted(evidenceId);
+    const isSoftDeleted = !existing && existingIncludeDeleted;
     const connectionsBefore = ConnectionRepository.findByEvidenceId(evidenceId);
 
     let restoredEvidence: Evidence;
+
+    if (isSoftDeleted) {
+      const beforeForDiff: Evidence = { ...existingIncludeDeleted! };
+      const unarchived = EvidenceRepository.restore(evidenceId);
+      if (!unarchived) {
+        throw new Error('恢复软删除证据失败');
+      }
+      const updateDto: UpdateEvidenceDto = {};
+      if (restoreState.content !== undefined) updateDto.content = restoreState.content;
+      if (restoreState.source !== undefined) updateDto.source = restoreState.source;
+      if (restoreState.importance !== undefined) updateDto.importance = restoreState.importance;
+      if (restoreState.tags !== undefined) updateDto.tags = restoreState.tags;
+      if (restoreState.positionX !== undefined) updateDto.positionX = restoreState.positionX;
+      if (restoreState.positionY !== undefined) updateDto.positionY = restoreState.positionY;
+      if (restoreState.width !== undefined) updateDto.width = restoreState.width;
+      if (restoreState.height !== undefined) updateDto.height = restoreState.height;
+      if (restoreState.color !== undefined) updateDto.color = restoreState.color;
+      if (restoreState.timestamp !== undefined) updateDto.timestamp = restoreState.timestamp;
+      if (restoreState.assignedTo !== undefined) updateDto.assignedTo = restoreState.assignedTo;
+      if (restoreState.status !== undefined) updateDto.status = restoreState.status;
+
+      const updateResult = EvidenceRepository.update(evidenceId, updateDto);
+      restoredEvidence = updateResult ?? unarchived;
+
+      ConnectionRepository.restoreByEvidenceId(evidenceId);
+
+      const diffFromSoftDelete = EvidenceVersionService.computeFieldDiffs(beforeForDiff, restoredEvidence);
+      const fd = diffFromSoftDelete.fieldDiffs;
+      const tc = diffFromSoftDelete.tagChanges;
+      // 立即记录恢复软删除版本并继续下面的关系同步
+      const syncNow = () => ({ fieldDiffs: fd, tagChanges: tc });
+      const synced = syncNow();
+
+      const connectionChangesPre: RelationChange[] = [];
+      if (targetVersion.relatedConnectionsSnapshot) {
+        const currentConnsMap = new Map<Connection['id'], Connection>();
+        const allCurrentAfterRestore = ConnectionRepository.findByEvidenceId(evidenceId);
+        for (const c of allCurrentAfterRestore) currentConnsMap.set(c.id, c);
+        const snapshotConnsMap = new Map(targetVersion.relatedConnectionsSnapshot.map((c) => [c.id, c]));
+        const snapshotConnIds = new Set(targetVersion.relatedConnectionsSnapshot.map((c) => c.id));
+
+        for (const [connId, sc] of snapshotConnsMap) {
+          if (!currentConnsMap.has(connId)) {
+            const fromExists = EvidenceRepository.findById(sc.fromEvidenceId);
+            const toExists = EvidenceRepository.findById(sc.toEvidenceId);
+            if (fromExists && toExists) {
+              ConnectionRepository.createWithId(connId, {
+                caseId: sc.caseId,
+                fromEvidenceId: sc.fromEvidenceId,
+                toEvidenceId: sc.toEvidenceId,
+                label: sc.label,
+                color: sc.color,
+                lineStyle: sc.lineStyle,
+              } as CreateConnectionDto);
+              connectionChangesPre.push({
+                type: 'add',
+                connectionId: connId,
+                fromEvidenceId: sc.fromEvidenceId,
+                toEvidenceId: sc.toEvidenceId,
+                newLabel: sc.label,
+                newColor: sc.color,
+                newLineStyle: sc.lineStyle,
+              });
+            }
+          } else {
+            const cc = currentConnsMap.get(connId)!;
+            const hasChange = cc.label !== sc.label || cc.color !== sc.color || cc.lineStyle !== sc.lineStyle;
+            if (hasChange) {
+              ConnectionRepository.update(connId, {
+                label: sc.label,
+                color: sc.color,
+                lineStyle: sc.lineStyle,
+              });
+              connectionChangesPre.push({
+                type: 'update',
+                connectionId: connId,
+                fromEvidenceId: sc.fromEvidenceId,
+                toEvidenceId: sc.toEvidenceId,
+                oldLabel: cc.label,
+                newLabel: sc.label,
+                oldColor: cc.color,
+                newColor: sc.color,
+                oldLineStyle: cc.lineStyle,
+                newLineStyle: sc.lineStyle,
+              });
+            }
+          }
+        }
+
+        for (const [connId, cc] of currentConnsMap) {
+          if (!snapshotConnIds.has(connId)) {
+            connectionChangesPre.push({
+              type: 'remove',
+              connectionId: connId,
+              fromEvidenceId: cc.fromEvidenceId,
+              toEvidenceId: cc.toEvidenceId,
+              oldLabel: cc.label,
+              oldColor: cc.color,
+              oldLineStyle: cc.lineStyle,
+            });
+            ConnectionRepository.delete(connId);
+          }
+        }
+      }
+
+      const connectionsAfter = ConnectionRepository.findByEvidenceId(evidenceId);
+      const restoreDto: CreateEvidenceVersionDto = {
+        evidenceId: restoredEvidence.id,
+        caseId: restoredEvidence.caseId,
+        changeType: 'restore',
+        changeSummary: `恢复到版本 v${targetVersion.versionNumber}（${targetVersion.createdAt.slice(0, 19).replace('T', ' ')}）`,
+        beforeState: existing ?? null,
+        afterState: { ...restoredEvidence },
+        fieldDiffs: synced.fieldDiffs,
+        tagChanges: synced.tagChanges,
+        relationChanges: connectionChangesPre,
+        relatedConnectionsSnapshot: connectionsAfter,
+        collaboratorId: collaboratorId ?? null,
+        collaboratorName: collaboratorName ?? null,
+        restoredFromVersionId: versionId,
+      };
+      EvidenceVersionRepository.create(restoreDto);
+      return restoredEvidence;
+    }
 
     if (!existing) {
       if (!restoreState.caseId) {
@@ -647,5 +773,48 @@ export const EvidenceVersionService = {
       byEvidence,
       uniqueEvidenceCount: Object.keys(byEvidence).length,
     };
+  },
+
+  _recordRestoreFromDelete: (
+    restoredEvidence: Evidence,
+    deletedInfo: Evidence & { deletedAt: string; deletedBy: string | null; deletedByName: string | null },
+    collaboratorId: string | null,
+    collaboratorName: string | null
+  ): EvidenceVersion => {
+    const beforeState: Partial<Evidence> & { deletedAt?: string; deletedBy?: string | null; deletedByName?: string | null } = { ...deletedInfo };
+    delete beforeState.deletedAt;
+    delete beforeState.deletedBy;
+    delete beforeState.deletedByName;
+
+    const { fieldDiffs, tagChanges } = EvidenceVersionService.computeFieldDiffs(
+      beforeState as Partial<Evidence>,
+      restoredEvidence
+    );
+
+    const connections = ConnectionRepository.findByEvidenceId(restoredEvidence.id);
+
+    const dto: CreateEvidenceVersionDto = {
+      evidenceId: restoredEvidence.id,
+      caseId: restoredEvidence.caseId,
+      changeType: 'restore',
+      changeSummary: `恢复已删除的证据（删除于${deletedInfo.deletedAt.slice(0, 19).replace('T', ' ')}，操作人: ${deletedInfo.deletedByName ?? deletedInfo.deletedBy ?? '(未知)'}）`,
+      beforeState: beforeState as Partial<Evidence>,
+      afterState: { ...restoredEvidence },
+      fieldDiffs,
+      tagChanges,
+      relationChanges: connections.map(c => ({
+        type: 'add' as const,
+        connectionId: c.id,
+        fromEvidenceId: c.fromEvidenceId,
+        toEvidenceId: c.toEvidenceId,
+        newLabel: c.label,
+        newColor: c.color,
+        newLineStyle: c.lineStyle,
+      })),
+      relatedConnectionsSnapshot: connections,
+      collaboratorId,
+      collaboratorName,
+    };
+    return EvidenceVersionRepository.create(dto);
   },
 };

@@ -37,6 +37,12 @@ export interface Evidence {
   status: TaskStatus;
 }
 
+export interface DeletedEvidenceInfo extends Evidence {
+  deletedAt: string;
+  deletedBy: string | null;
+  deletedByName: string | null;
+}
+
 export interface Connection {
   id: string;
   caseId: string;
