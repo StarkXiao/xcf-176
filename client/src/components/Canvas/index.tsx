@@ -10,11 +10,9 @@ import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useCaseStore } from '@/store/useCaseStore';
 import { useUiStore } from '@/store/useUiStore';
-import { connectionApi } from '@/api/connectionApi';
-import { generateConnectionId } from '@/utils/idGenerator';
-import { recordAuditLog, captureConnectionSnapshot } from '@/utils/auditHelper';
 import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
 import type { Connection, Evidence } from '@/types';
+import type { PendingConnectionData } from '@/store/useUiStore';
 
 export const Canvas: React.FC = () => {
   const {
@@ -31,8 +29,6 @@ export const Canvas: React.FC = () => {
   } = useCanvas();
 
   const {
-    handleDragStart,
-    handleDragEnd,
     handleDragOver,
     handleDropFromSidebar,
     handleCardMouseDown,
@@ -50,7 +46,7 @@ export const Canvas: React.FC = () => {
   const getEvidenceById = useEvidenceStore((state) => state.getEvidenceById);
   const currentCase = useCaseStore((state) => state.currentCase);
   const pendingRelationType = useUiStore((state) => state.pendingRelationType);
-  const setPendingRelationType = useUiStore((state) => state.setPendingRelationType);
+  const openConnectionDialog = useUiStore((state) => state.openConnectionDialog);
   const timelineHighlightId = useCanvasStore((state) => state.timelineHighlightId);
   const timeRangeFilter = useCanvasStore((state) => state.timeRangeFilter);
 
@@ -130,41 +126,37 @@ export const Canvas: React.FC = () => {
             const toEvidence = getEvidenceById(toId);
 
             if (fromEvidence && toEvidence) {
+              const tempConnectionId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
               const lineStyle = (pendingRelationType?.lineStyle || 'solid') as Connection['lineStyle'];
-              const newConnection = {
-                id: generateConnectionId(),
+              const defaultColor = pendingRelationType?.color || CYBERPUNK_COLORS.accentCyan;
+              const defaultLabel = pendingRelationType?.label || '';
+              const defaultRelationTypeId = pendingRelationType?.id || null;
+
+              const previewConnection: Connection = {
+                id: tempConnectionId,
                 caseId: currentCase.id,
                 fromEvidenceId: drawingConnection.fromId,
                 toEvidenceId: toId,
-                label: pendingRelationType?.label || '',
-                color: pendingRelationType?.color || CYBERPUNK_COLORS.accentCyan,
+                label: defaultLabel,
+                color: defaultColor,
                 lineStyle,
+                relationTypeId: defaultRelationTypeId,
                 createdAt: new Date().toISOString(),
               };
 
-              connectionApi.create({
-                caseId: currentCase.id,
+              addConnection(previewConnection);
+
+              const pendingData: PendingConnectionData = {
                 fromEvidenceId: drawingConnection.fromId,
                 toEvidenceId: toId,
-                label: pendingRelationType?.label || '',
-                color: pendingRelationType?.color || CYBERPUNK_COLORS.accentCyan,
-                lineStyle: pendingRelationType?.lineStyle || 'solid',
-              });
+                label: defaultLabel,
+                color: defaultColor,
+                lineStyle,
+                relationTypeId: defaultRelationTypeId,
+                tempConnectionId,
+              };
 
-              addConnection(newConnection);
-
-              if (pendingRelationType) {
-                setPendingRelationType(null);
-              }
-
-              const snapshot = captureConnectionSnapshot(newConnection);
-              recordAuditLog(
-                'create_connection',
-                'connection',
-                newConnection.id,
-                `创建关联: ${fromEvidence.content.slice(0, 20)} → ${toEvidence.content.slice(0, 20)}`,
-                snapshot
-              );
+              openConnectionDialog(pendingData);
             }
           }
         }
@@ -179,7 +171,7 @@ export const Canvas: React.FC = () => {
       addConnection,
       endDrawingConnection,
       pendingRelationType,
-      setPendingRelationType,
+      openConnectionDialog,
     ]
   );
 

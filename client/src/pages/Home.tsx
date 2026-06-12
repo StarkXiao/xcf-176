@@ -17,6 +17,7 @@ import { ReportPanel } from '@/components/ReportPanel';
 import { CrossCaseComparisonPanel } from '@/components/CrossCaseComparisonPanel';
 import { ConnectionGroupPanel } from '@/components/ConnectionGroupPanel';
 import { CaseOverviewPanel } from '@/components/CaseOverviewPanel';
+import { ConnectionCreateDialog } from '@/components/PropertyPanel/ConnectionCreateDialog';
 import { ScanlineEffect } from '@/components/ui/ScanlineEffect';
 import { useUiStore } from '@/store/useUiStore';
 import { useCaseStore } from '@/store/useCaseStore';
@@ -169,6 +170,7 @@ const Home: React.FC = () => {
       </div>
 
       <CaseSelector />
+      <ConnectionCreateDialog />
       <ScanlineEffect />
     </div>
   );

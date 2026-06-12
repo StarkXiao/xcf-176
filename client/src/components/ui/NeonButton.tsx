@@ -8,6 +8,7 @@ interface NeonButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
   glow?: boolean;
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
+  glowColor?: string;
 }
 
 const variantColors: Record<string, string> = {
@@ -34,9 +35,10 @@ export const NeonButton: React.FC<NeonButtonProps> = ({
   className,
   style,
   disabled,
+  glowColor,
   ...props
 }) => {
-  const color = variantColors[variant];
+  const color = glowColor || variantColors[variant];
   const baseClasses = twMerge(
     'relative font-mono uppercase tracking-wider transition-all duration-200',
     'border rounded-sm focus:outline-none',

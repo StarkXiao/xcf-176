@@ -1,7 +1,17 @@
 import { create } from 'zustand';
-import type { TemplateRelationType } from '@/types';
+import type { TemplateRelationType, Connection } from '@/types';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+export interface PendingConnectionData {
+  fromEvidenceId: string;
+  toEvidenceId: string;
+  label: string;
+  color: string;
+  lineStyle: Connection['lineStyle'];
+  relationTypeId: string | null;
+  tempConnectionId: string | null;
+}
 
 interface UiState {
   sidebarOpen: boolean;
@@ -24,6 +34,9 @@ interface UiState {
   currentTime: string;
   currentCollaboratorId: string | null;
   pendingRelationType: TemplateRelationType | null;
+  connectionDialogOpen: boolean;
+  pendingConnection: PendingConnectionData | null;
+  connectionCreationError: string | null;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   togglePropertyPanel: () => void;
@@ -59,6 +72,10 @@ interface UiState {
   updateCurrentTime: () => void;
   setCurrentCollaboratorId: (id: string | null) => void;
   setPendingRelationType: (type: TemplateRelationType | null) => void;
+  openConnectionDialog: (data: PendingConnectionData) => void;
+  closeConnectionDialog: () => void;
+  updatePendingConnection: (patch: Partial<PendingConnectionData>) => void;
+  setConnectionCreationError: (error: string | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -82,6 +99,9 @@ export const useUiStore = create<UiState>((set) => ({
   currentTime: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
   currentCollaboratorId: null,
   pendingRelationType: null,
+  connectionDialogOpen: false,
+  pendingConnection: null,
+  connectionCreationError: null,
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -141,4 +161,23 @@ export const useUiStore = create<UiState>((set) => ({
   setCurrentCollaboratorId: (id) => set({ currentCollaboratorId: id }),
 
   setPendingRelationType: (type) => set({ pendingRelationType: type }),
+
+  openConnectionDialog: (data) => set({
+    connectionDialogOpen: true,
+    pendingConnection: data,
+    connectionCreationError: null,
+  }),
+
+  closeConnectionDialog: () => set({
+    connectionDialogOpen: false,
+    connectionCreationError: null,
+  }),
+
+  updatePendingConnection: (patch) => set((state) => ({
+    pendingConnection: state.pendingConnection
+      ? { ...state.pendingConnection, ...patch }
+      : null,
+  })),
+
+  setConnectionCreationError: (error) => set({ connectionCreationError: error }),
 }));

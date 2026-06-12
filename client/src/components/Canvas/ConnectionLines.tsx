@@ -102,7 +102,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         const isVisible = isVisibleProp && isStoreVisible;
         const isHighlighted = highlightConnectionIds !== null && highlightConnectionIds.has(connection.id);
         const isSelected = selectedConnectionId === connection.id;
-        const opacity = isVisible ? (isHighlighted ? 1 : 1) : 0.15;
+        const isTemporary = connection.id.startsWith('temp-');
+        const opacity = isVisible ? (isHighlighted ? 1 : isTemporary ? 0.75 : 1) : 0.15;
         const dimmed = !isVisible;
 
         const group = connectionGroups.find((g) => g.connectionIds.includes(connection.id));
@@ -116,26 +117,38 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         return (
           <g
             key={connection.id}
-            className={`pointer-events-auto ${isHighlighted ? 'animate-pulse' : ''}`}
+            className={`pointer-events-auto ${isHighlighted ? 'animate-pulse' : ''} ${isTemporary ? 'animate-pulse' : ''}`}
             style={{
               opacity,
               transition: 'opacity 0.3s ease',
-              filter: dimmed ? 'grayscale(60%)' : 'none',
+              filter: dimmed ? 'grayscale(60%)' : isTemporary ? 'hue-rotate(10deg) saturate(1.2)' : 'none',
             }}
           >
-            {(isSelected || isHighlighted) && (
+            {(isSelected || isHighlighted || isTemporary) && (
               <path
                 d={path}
                 fill="none"
-                stroke={isHighlighted ? CYBERPUNK_COLORS.accentCyan : CYBERPUNK_COLORS.accentYellow}
-                strokeWidth={(isHighlighted ? 8 : 6) / zoom}
-                strokeDasharray={isHighlighted ? 'none' : '8,4'}
+                stroke={
+                  isHighlighted
+                    ? CYBERPUNK_COLORS.accentCyan
+                    : isTemporary
+                    ? displayColor
+                    : CYBERPUNK_COLORS.accentYellow
+                }
+                strokeWidth={
+                  (isHighlighted ? 8 : isTemporary ? 9 : 6) / zoom
+                }
+                strokeDasharray={isHighlighted || isTemporary ? '14,6' : '8,4'}
                 style={{
                   filter: `drop-shadow(0 0 12px ${getGlowColor(
-                    isHighlighted ? CYBERPUNK_COLORS.accentCyan : CYBERPUNK_COLORS.accentYellow,
+                    isHighlighted
+                      ? CYBERPUNK_COLORS.accentCyan
+                      : isTemporary
+                      ? displayColor
+                      : CYBERPUNK_COLORS.accentYellow,
                     0.8
                   )})`,
-                  opacity: 0.7,
+                  opacity: 0.6,
                 }}
               />
             )}
@@ -143,16 +156,16 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
               d={path}
               fill="none"
               stroke={color}
-              strokeWidth={(isHighlighted ? 3 : 2) / zoom}
-              strokeDasharray={getStrokeDasharray(connection.lineStyle)}
+              strokeWidth={(isHighlighted ? 3 : isTemporary ? 2.5 : 2) / zoom}
+              strokeDasharray={isTemporary ? '10,5' : getStrokeDasharray(connection.lineStyle)}
               filter="url(#glow)"
               style={{
-                filter: `drop-shadow(0 0 ${isHighlighted ? 10 : 6}px ${getGlowColor(color, isHighlighted ? 0.8 : 0.6)})`,
-                cursor: dimmed ? 'default' : 'pointer',
+                filter: `drop-shadow(0 0 ${isHighlighted ? 10 : isTemporary ? 8 : 6}px ${getGlowColor(color, isHighlighted ? 0.8 : isTemporary ? 0.9 : 0.6)})`,
+                cursor: dimmed ? 'default' : isTemporary ? 'progress' : 'pointer',
                 pointerEvents: dimmed ? 'none' : 'auto',
               }}
-              onClick={(e) => !dimmed && handleConnectionClick(e, connection.id)}
-              onDoubleClick={(e) => !dimmed && handleConnectionDoubleClick(e, connection.id)}
+              onClick={(e) => !dimmed && !isTemporary && handleConnectionClick(e, connection.id)}
+              onDoubleClick={(e) => !dimmed && !isTemporary && handleConnectionDoubleClick(e, connection.id)}
             />
             <path
               d={path}
@@ -160,36 +173,67 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
               stroke="transparent"
               strokeWidth={20 / zoom}
               style={{
-                cursor: dimmed ? 'default' : 'pointer',
+                cursor: dimmed ? 'default' : isTemporary ? 'progress' : 'pointer',
                 pointerEvents: dimmed ? 'none' : 'auto',
               }}
-              onClick={(e) => !dimmed && handleConnectionClick(e, connection.id)}
-              onDoubleClick={(e) => !dimmed && handleConnectionDoubleClick(e, connection.id)}
+              onClick={(e) => !dimmed && !isTemporary && handleConnectionClick(e, connection.id)}
+              onDoubleClick={(e) => !dimmed && !isTemporary && handleConnectionDoubleClick(e, connection.id)}
             />
 
             {connection.label && (
               <foreignObject
-                x={midpoint.x - 60}
-                y={midpoint.y - 15}
-                width={120}
-                height={30}
+                x={midpoint.x - 70}
+                y={midpoint.y - 18}
+                width={140}
+                height={36}
                 style={{
-                  pointerEvents: dimmed ? 'none' : 'none',
+                  pointerEvents: 'none',
                   overflow: 'visible',
                 }}
               >
                 <div
-                  className="text-center text-xs font-mono px-2 py-1 rounded-sm"
+                  className="text-center text-xs font-mono px-2 py-1 rounded-sm flex items-center justify-center gap-1"
                   style={{
-                    backgroundColor: getGlowColor(CYBERPUNK_COLORS.bgPrimary, 0.9),
-                    color: color,
-                    border: `1px solid ${color}`,
-                    textShadow: `0 0 6px ${getGlowColor(color, 0.8)}`,
+                    backgroundColor: isTemporary
+                      ? getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.9)
+                      : getGlowColor(CYBERPUNK_COLORS.bgPrimary, 0.9),
+                    color: isTemporary ? CYBERPUNK_COLORS.bgPrimary : color,
+                    border: `1px solid ${isTemporary ? CYBERPUNK_COLORS.accentYellow : color}`,
+                    textShadow: isTemporary ? 'none' : `0 0 6px ${getGlowColor(color, 0.8)}`,
                     opacity: dimmed ? 0.4 : 1,
                     transition: 'opacity 0.3s ease',
+                    boxShadow: isTemporary ? `0 0 8px ${getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.7)}` : 'none',
                   }}
                 >
-                  {connection.label}
+                  {isTemporary && <span>⏳</span>}
+                  <span className="truncate">{connection.label}</span>
+                </div>
+              </foreignObject>
+            )}
+
+            {isTemporary && !connection.label && (
+              <foreignObject
+                x={midpoint.x - 60}
+                y={midpoint.y - 14}
+                width={120}
+                height={28}
+                style={{
+                  pointerEvents: 'none',
+                  overflow: 'visible',
+                }}
+              >
+                <div
+                  className="text-center text-[10px] font-mono px-2 py-0.5 rounded-sm flex items-center justify-center gap-1 animate-pulse"
+                  style={{
+                    backgroundColor: getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.95),
+                    color: CYBERPUNK_COLORS.bgPrimary,
+                    border: `1px solid ${CYBERPUNK_COLORS.accentYellow}`,
+                    boxShadow: `0 0 10px ${getGlowColor(CYBERPUNK_COLORS.accentYellow, 0.8)}`,
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>⏳</span>
+                  <span>待确认</span>
                 </div>
               </foreignObject>
             )}
