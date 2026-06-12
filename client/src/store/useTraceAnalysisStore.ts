@@ -223,12 +223,7 @@ export function filterGraphByPerspective(graph: TraceGraph, perspective: TracePe
     }
 
     case 'credibility': {
-      const credibilityNodes = graph.nodes.filter(
-        (n) => n.sourceCredibility && n.sourceCredibility !== 'very_low' && n.sourceCredibility !== 'low'
-      );
-      if (credibilityNodes.length === 0) {
-        return { nodes: graph.nodes.filter((n) => n.sourceCredibility), edges: [] };
-      }
+      const credibilityNodes = graph.nodes.filter((n) => n.sourceCredibility);
       const credibilityNodeIds = new Set(credibilityNodes.map((n) => n.id));
       const credibilityEdges = graph.edges.filter(
         (e) => credibilityNodeIds.has(e.fromNodeId) && credibilityNodeIds.has(e.toNodeId)
