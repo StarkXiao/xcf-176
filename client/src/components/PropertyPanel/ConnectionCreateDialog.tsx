@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { X, Link2, Palette, PenLine, Sparkles, AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { NeonInput } from '@/components/ui/NeonInput';
 import { NeonButton } from '@/components/ui/NeonButton';
@@ -9,7 +9,6 @@ import { useUiStore } from '@/store/useUiStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { connectionApi } from '@/api/connectionApi';
 import { captureConnectionSnapshot, recordAuditLog } from '@/utils/auditHelper';
-import { generateConnectionId } from '@/utils/idGenerator';
 import {
   CYBERPUNK_COLORS,
   getGlowColor,
@@ -53,6 +52,15 @@ export const ConnectionCreateDialog: React.FC = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (pendingConnection?.tempConnectionId && !isSuccess) {
+        removeConnection(pendingConnection.tempConnectionId);
+      }
+    };
+  }, [pendingConnection?.tempConnectionId, isSuccess, removeConnection]);
 
   const fromEvidence = pendingConnection ? getEvidenceById(pendingConnection.fromEvidenceId) : null;
   const toEvidence = pendingConnection ? getEvidenceById(pendingConnection.toEvidenceId) : null;
@@ -78,20 +86,6 @@ export const ConnectionCreateDialog: React.FC = () => {
 
     const { fromEvidenceId, toEvidenceId, label, color, lineStyle, relationTypeId, tempConnectionId } = pendingConnection;
 
-    const newConnection: Connection = {
-      id: tempConnectionId || generateConnectionId(),
-      caseId: currentCase.id,
-      fromEvidenceId,
-      toEvidenceId,
-      label,
-      color,
-      lineStyle,
-      relationTypeId,
-      createdAt: new Date().toISOString(),
-    };
-
-    addConnection(newConnection);
-
     try {
       const res = await connectionApi.create({
         caseId: currentCase.id,
@@ -103,17 +97,25 @@ export const ConnectionCreateDialog: React.FC = () => {
         relationTypeId: relationTypeId || undefined,
       });
 
-      if (!res.success) {
+      if (!res.success || !res.data) {
         throw new Error(res.error || '创建关联失败');
       }
 
-      const snapshot = captureConnectionSnapshot(newConnection);
+      const realConnection: Connection = res.data;
+
+      if (tempConnectionId) {
+        removeConnection(tempConnectionId);
+      }
+
+      addConnection(realConnection);
+
+      const snapshot = captureConnectionSnapshot(realConnection);
       const fromLabel = fromEvidence ? fromEvidence.content.slice(0, 20) : '?';
       const toLabel = toEvidence ? toEvidence.content.slice(0, 20) : '?';
       recordAuditLog(
         'create_connection',
         'connection',
-        newConnection.id,
+        realConnection.id,
         `创建关联: ${fromLabel} → ${toLabel}${label ? ` (${label})` : ''}`,
         snapshot
       );
@@ -122,12 +124,11 @@ export const ConnectionCreateDialog: React.FC = () => {
         setPendingRelationType(null);
       }
 
+      setIsSuccess(true);
       closeConnectionDialog();
-      setSelectedConnectionId(newConnection.id);
+      setSelectedConnectionId(realConnection.id);
       setSelectedId(null);
     } catch (err) {
-      removeConnection(newConnection.id);
-
       const errorMsg = err instanceof Error ? err.message : '网络请求失败，请检查网络连接';
       setConnectionCreationError(errorMsg);
     } finally {
@@ -146,6 +147,7 @@ export const ConnectionCreateDialog: React.FC = () => {
     setSelectedConnectionId,
     setSelectedId,
     setConnectionCreationError,
+    setIsSuccess,
   ]);
 
   const handleRetry = useCallback(() => {
