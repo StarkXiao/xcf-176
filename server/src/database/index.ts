@@ -39,6 +39,8 @@ const createTables = () => {
       case_id TEXT NOT NULL,
       content TEXT NOT NULL,
       source TEXT DEFAULT 'unknown',
+      source_credibility TEXT NOT NULL DEFAULT 'medium',
+      verification_status TEXT NOT NULL DEFAULT 'unverified',
       importance TEXT NOT NULL DEFAULT 'normal',
       tags TEXT DEFAULT '[]',
       position_x REAL NOT NULL DEFAULT 0,
@@ -448,7 +450,15 @@ const runMigrations = () => {
   if (!evColumnNames.includes('deleted_by_name')) {
     db.exec('ALTER TABLE evidence ADD COLUMN deleted_by_name TEXT');
   }
+  if (!evColumnNames.includes('source_credibility')) {
+    db.exec("ALTER TABLE evidence ADD COLUMN source_credibility TEXT NOT NULL DEFAULT 'medium'");
+  }
+  if (!evColumnNames.includes('verification_status')) {
+    db.exec("ALTER TABLE evidence ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'unverified'");
+  }
   db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_deleted_at ON evidence(deleted_at);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_source_credibility ON evidence(source_credibility);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_evidence_verification_status ON evidence(verification_status);');
 
   const connColumns = db.prepare("PRAGMA table_info(connections)").all() as { name: string }[];
   const connColumnNames = connColumns.map(c => c.name);
@@ -540,10 +550,10 @@ const seedData = () => {
 
   const insertEvidence = db.prepare(`
     INSERT INTO evidence (
-      id, case_id, content, source, importance, tags,
-      position_x, position_y, width, height, color, timestamp,
+      id, case_id, content, source, source_credibility, verification_status,
+      importance, tags, position_x, position_y, width, height, color, timestamp,
       assigned_to, status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const evidences: Omit<Evidence, 'createdAt'>[] = [
@@ -552,6 +562,8 @@ const seedData = () => {
       caseId,
       content: '[微信 2024-06-10 14:32]\n王总：小李啊，最近我这边有个内部投资渠道，年化收益能到35%，一般人我不告诉他。\n小李：王总，这靠谱吗？会不会有风险？\n王总：你放心，我亲戚在证监会上班，有内部消息，已经运作好几年了。',
       source: '微信聊天记录 - 李某手机提取',
+      sourceCredibility: 'high',
+      verificationStatus: 'verified',
       importance: 'high',
       tags: ['聊天记录', '投资诱导', '内部消息'],
       positionX: 100,
@@ -568,6 +580,8 @@ const seedData = () => {
       caseId,
       content: '[Telegram 2024-06-12 09:15]\n理财顾问-张婷：李先生您好，我是"鼎盛财富"的专属顾问张婷，工号DP00128。\n理财顾问-张婷：您在我们平台注册的体验金已经到账，可以开始体验了。\n小李：好的，我先试试1000块的。',
       source: 'Telegram 聊天记录 - 李某手机提取',
+      sourceCredibility: 'high',
+      verificationStatus: 'verified',
       importance: 'critical',
       tags: ['聊天记录', '虚假平台', '理财顾问'],
       positionX: 450,
@@ -584,6 +598,8 @@ const seedData = () => {
       caseId,
       content: '[微信 2024-06-15 16:48]\n王总：小李，昨天的20万收益到账了吧？\n小李：到了到了！太感谢王总了！一天就赚了3万！\n王总：我说的没错吧？要是投100万，一天就是15万。\n小李：王总，我准备把房子抵押了，凑500万投进去！',
       source: '微信聊天记录 - 李某手机提取',
+      sourceCredibility: 'high',
+      verificationStatus: 'verified',
       importance: 'critical',
       tags: ['聊天记录', '收益诱惑', '大额投资'],
       positionX: 800,
@@ -600,6 +616,8 @@ const seedData = () => {
       caseId,
       content: '[银行转账记录 2024-06-16 10:22]\n\n付款人：李某某\n收款人：张某某\n卡号：622848 **** **** 1234\n金额：¥5,000,000.00\n附言：投资款\n\n交易状态：已成功',
       source: '中国农业银行交易流水',
+      sourceCredibility: 'very_high',
+      verificationStatus: 'verified',
       importance: 'critical',
       tags: ['银行记录', '资金转移', '500万'],
       positionX: 100,
@@ -616,6 +634,8 @@ const seedData = () => {
       caseId,
       content: '[Telegram 2024-06-18 23:05]\n理财顾问-张婷：李先生，系统检测到您的账户存在异常操作。\n理财顾问-张婷：需要您再缴纳20%的保证金才能解冻账户。\n小李：什么？我刚投了500万啊！\n理财顾问-张婷：这是银监会的规定，没办法的。缴纳后24小时内就可以正常提现了。',
       source: 'Telegram 聊天记录 - 李某手机提取',
+      sourceCredibility: 'high',
+      verificationStatus: 'verified',
       importance: 'high',
       tags: ['聊天记录', '账户冻结', '保证金诈骗'],
       positionX: 450,
@@ -632,6 +652,8 @@ const seedData = () => {
       caseId,
       content: '[微信 2024-06-20 08:30]\n小李：王总，我的账户被冻结了，张婷说要交保证金。\n王总：小李别急，我帮你问问。\n王总：问清楚了，确实是银监会的新规定。我之前也遇到过，交了就好了。\n王总：机会难得啊，这时候可不能前功尽弃。',
       source: '微信聊天记录 - 李某手机提取',
+      sourceCredibility: 'high',
+      verificationStatus: 'pending',
       importance: 'high',
       tags: ['聊天记录', '团伙配合', '诱导转账'],
       positionX: 800,
@@ -648,6 +670,8 @@ const seedData = () => {
       caseId,
       content: '[IP 地址分析报告]\n\n"鼎盛财富"平台服务器IP：45.xxx.xxx.128\n注册地：塞舌尔群岛\n实际IP定位：缅甸果敢地区\n\n相关域名注册信息：\n- dscf888.com  注册人：XXX\n- 注册邮箱：fake@email.com\n- 注册时间：2024-03-15',
       source: '网安支队技术分析报告',
+      sourceCredibility: 'very_high',
+      verificationStatus: 'verified',
       importance: 'high',
       tags: ['技术分析', 'IP定位', '境外服务器'],
       positionX: 100,
@@ -664,6 +688,8 @@ const seedData = () => {
       caseId,
       content: '[通话录音 2024-06-21 15:42]\n\n小李：我已经报案了，你们跑不掉的！\n王总（笑）：报案？你去告啊，我人在国外，你能奈我何？\n王总：实话告诉你，什么投资平台，都是我们自己做的。\n王总：你那500万，早就转到境外了，追不回来咯～\n\n（通话时长：3分42秒）',
       source: '李某提供的通话录音',
+      sourceCredibility: 'medium',
+      verificationStatus: 'disputed',
       importance: 'critical',
       tags: ['录音证据', '嫌疑人承认', '境外窝点'],
       positionX: 450,
@@ -680,6 +706,8 @@ const seedData = () => {
       caseId,
       content: '[资金流向分析]\n\n李某某 500万\n  ↓\n张某某账户（农业银行）\n  ↓ 2024-06-16 14:32 转出 480万\n  ↓\n刘某某账户（工商银行）\n  ↓ 2024-06-16 16:15 分12笔转出\n  ↓\n多个地下钱庄账户\n  ↓\n境外虚拟货币钱包地址：\n0x7a250d...f88a',
       source: '反洗钱中心协查报告',
+      sourceCredibility: 'very_high',
+      verificationStatus: 'verified',
       importance: 'critical',
       tags: ['资金流向', '地下钱庄', '虚拟货币'],
       positionX: 800,
@@ -699,6 +727,8 @@ const seedData = () => {
       ev.caseId,
       ev.content,
       ev.source,
+      ev.sourceCredibility,
+      ev.verificationStatus,
       ev.importance,
       JSON.stringify(ev.tags),
       ev.positionX,

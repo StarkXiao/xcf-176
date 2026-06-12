@@ -43,6 +43,8 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
     keyword: '',
     tags: [],
     importance: undefined,
+    sourceCredibility: undefined,
+    verificationStatus: undefined,
   },
 
   getEvidenceArray: () => Object.values(get().evidence),
@@ -77,6 +79,14 @@ export const useEvidenceStore = create<EvidenceState>((set, get) => ({
       }
 
       if (searchFilters.importance && ev.importance !== searchFilters.importance) {
+        return false;
+      }
+
+      if (searchFilters.sourceCredibility && ev.sourceCredibility !== searchFilters.sourceCredibility) {
+        return false;
+      }
+
+      if (searchFilters.verificationStatus && ev.verificationStatus !== searchFilters.verificationStatus) {
         return false;
       }
 

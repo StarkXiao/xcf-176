@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { GitBranch, X, ZoomIn, ZoomOut, Maximize2, FileText, ShieldCheck, ScrollText } from 'lucide-react';
+import { GitBranch, X, ZoomIn, ZoomOut, Maximize2, FileText, Shield, ShieldCheck, ScrollText } from 'lucide-react';
 import { useTraceAnalysisStore, filterGraphByPerspective } from '@/store/useTraceAnalysisStore';
 import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
@@ -7,7 +7,7 @@ import { useAuditLogStore } from '@/store/useAuditLogStore';
 import { useEvidenceCollectionStore } from '@/store/useEvidenceCollectionStore';
 import { useUiStore } from '@/store/useUiStore';
 import { useCaseStore } from '@/store/useCaseStore';
-import { CYBERPUNK_COLORS, getGlowColor, IMPORTANCE_COLORS } from '@/utils/colorUtils';
+import { CYBERPUNK_COLORS, getGlowColor, IMPORTANCE_COLORS, SOURCE_CREDIBILITY_COLORS, SOURCE_CREDIBILITY_LABELS, VERIFICATION_STATUS_COLORS, VERIFICATION_STATUS_LABELS } from '@/utils/colorUtils';
 import type { TraceNode, TracePerspective, TraceNodeKind, TraceEdgeKind } from '@/types';
 
 const PERSPECTIVE_CONFIG: Array<{ value: TracePerspective; label: string; icon: React.ReactNode; color: string }> = [
@@ -15,6 +15,8 @@ const PERSPECTIVE_CONFIG: Array<{ value: TracePerspective; label: string; icon: 
   { value: 'source', label: '来源渠道', icon: <ShieldCheck size={12} />, color: CYBERPUNK_COLORS.accentGreen },
   { value: 'relationship', label: '证据关系', icon: <GitBranch size={12} />, color: CYBERPUNK_COLORS.accentPurple },
   { value: 'importance', label: '重要性', icon: <ScrollText size={12} />, color: CYBERPUNK_COLORS.accentRed },
+  { value: 'credibility', label: '可信度', icon: <Shield size={12} />, color: CYBERPUNK_COLORS.accentYellow },
+  { value: 'verification', label: '核验状态', icon: <ShieldCheck size={12} />, color: CYBERPUNK_COLORS.accentOrange },
 ];
 
 const NODE_COLORS: Record<TraceNodeKind, string> = {
@@ -78,6 +80,52 @@ function layoutNodes(nodes: TraceNode[], perspective: TracePerspective): LayoutN
     const order = ['critical', 'high', 'normal', 'low'];
     nodes.forEach((n) => {
       const key = n.importance || 'normal';
+      const arr = groups.get(key) || [];
+      arr.push(n);
+      groups.set(key, arr);
+    });
+    order.forEach((key, colIdx) => {
+      const group = groups.get(key);
+      if (!group) return;
+      group.forEach((n, rowIdx) => {
+        layoutNodesResult.push({
+          ...n,
+          x: 80 + colIdx * NODE_SPACING_X * 1.5,
+          y: 60 + rowIdx * NODE_SPACING_Y,
+        });
+      });
+    });
+    return layoutNodesResult;
+  }
+
+  if (perspective === 'credibility') {
+    const groups = new Map<string, TraceNode[]>();
+    const order = ['very_high', 'high', 'medium', 'low', 'very_low'];
+    nodes.forEach((n) => {
+      const key = n.sourceCredibility || 'medium';
+      const arr = groups.get(key) || [];
+      arr.push(n);
+      groups.set(key, arr);
+    });
+    order.forEach((key, colIdx) => {
+      const group = groups.get(key);
+      if (!group) return;
+      group.forEach((n, rowIdx) => {
+        layoutNodesResult.push({
+          ...n,
+          x: 80 + colIdx * NODE_SPACING_X * 1.5,
+          y: 60 + rowIdx * NODE_SPACING_Y,
+        });
+      });
+    });
+    return layoutNodesResult;
+  }
+
+  if (perspective === 'verification') {
+    const groups = new Map<string, TraceNode[]>();
+    const order = ['verified', 'pending', 'unverified', 'failed', 'disputed'];
+    nodes.forEach((n) => {
+      const key = n.verificationStatus || 'unverified';
       const arr = groups.get(key) || [];
       arr.push(n);
       groups.set(key, arr);
@@ -487,6 +535,8 @@ export const TraceAnalysisPanel: React.FC = () => {
               const isHovered = hoveredNodeId === node.id;
               const opacity = isActive ? 1 : 0.2;
               const importanceColor = node.importance ? IMPORTANCE_COLORS[node.importance] : undefined;
+              const credibilityColor = node.sourceCredibility ? SOURCE_CREDIBILITY_COLORS[node.sourceCredibility] : undefined;
+              const verificationColor = node.verificationStatus ? VERIFICATION_STATUS_COLORS[node.verificationStatus] : undefined;
 
               return (
                 <g
@@ -502,6 +552,25 @@ export const TraceAnalysisPanel: React.FC = () => {
                   onMouseLeave={() => setHoveredNodeId(null)}
                   style={{ cursor: 'pointer' }}
                 >
+                  {credibilityColor && (
+                    <circle
+                      r={NODE_RADIUS + 10}
+                      fill="none"
+                      stroke={credibilityColor}
+                      strokeWidth={1.5}
+                      strokeDasharray="6,3"
+                      strokeOpacity={0.7}
+                    />
+                  )}
+                  {verificationColor && (
+                    <circle
+                      r={NODE_RADIUS + 7}
+                      fill="none"
+                      stroke={verificationColor}
+                      strokeWidth={1.5}
+                      strokeOpacity={0.8}
+                    />
+                  )}
                   <circle
                     r={NODE_RADIUS}
                     fill={CYBERPUNK_COLORS.bgTertiary}
@@ -578,6 +647,42 @@ export const TraceAnalysisPanel: React.FC = () => {
                 ))}
               </>
             )}
+
+            {perspective === 'credibility' && (
+              <>
+                {(['very_high', 'high', 'medium', 'low', 'very_low'] as const).map((key, colIdx) => (
+                  <text
+                    key={key}
+                    x={80 + colIdx * NODE_SPACING_X * 1.5}
+                    y={25}
+                    textAnchor="middle"
+                    fill={SOURCE_CREDIBILITY_COLORS[key]}
+                    fontSize="10"
+                    fontFamily="monospace"
+                  >
+                    {SOURCE_CREDIBILITY_LABELS[key]}
+                  </text>
+                ))}
+              </>
+            )}
+
+            {perspective === 'verification' && (
+              <>
+                {(['verified', 'pending', 'unverified', 'failed', 'disputed'] as const).map((key, colIdx) => (
+                  <text
+                    key={key}
+                    x={80 + colIdx * NODE_SPACING_X * 1.5}
+                    y={25}
+                    textAnchor="middle"
+                    fill={VERIFICATION_STATUS_COLORS[key]}
+                    fontSize="10"
+                    fontFamily="monospace"
+                  >
+                    {VERIFICATION_STATUS_LABELS[key]}
+                  </text>
+                ))}
+              </>
+            )}
           </svg>
         )}
       </div>
@@ -586,7 +691,7 @@ export const TraceAnalysisPanel: React.FC = () => {
         className="border-t px-3 py-2"
         style={{ borderColor: CYBERPUNK_COLORS.borderColor, backgroundColor: CYBERPUNK_COLORS.bgTertiary }}
       >
-        <div className="flex items-center gap-4 mb-1.5">
+        <div className="flex items-center gap-4 mb-1.5 flex-wrap">
           {Object.entries(KIND_LABELS).map(([kind, label]) => (
             <div key={kind} className="flex items-center gap-1">
               <div
@@ -601,6 +706,8 @@ export const TraceAnalysisPanel: React.FC = () => {
               </span>
             </div>
           ))}
+        </div>
+        <div className="flex items-center gap-4 mb-1.5 flex-wrap">
           {Object.entries(EDGE_KIND_LABELS).map(([kind, label]) => (
             <div key={kind} className="flex items-center gap-1">
               <div
@@ -615,6 +722,35 @@ export const TraceAnalysisPanel: React.FC = () => {
             </div>
           ))}
         </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-1">
+            <div
+              className="w-5 h-5 rounded-full border border-dashed"
+              style={{ borderColor: CYBERPUNK_COLORS.accentYellow, borderWidth: 1.5 }}
+            />
+            <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+              外圈虚线: 来源可信度
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div
+              className="w-4 h-4 rounded-full border"
+              style={{ borderColor: CYBERPUNK_COLORS.accentGreen, borderWidth: 1.5 }}
+            />
+            <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+              内圈实线: 核验状态
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div
+              className="w-3.5 h-3.5 rounded-full border border-dotted"
+              style={{ borderColor: CYBERPUNK_COLORS.accentRed, borderWidth: 1 }}
+            />
+            <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+              点线: 重要性
+            </span>
+          </div>
+        </div>
 
         {selectedNode && (
           <div
@@ -624,7 +760,7 @@ export const TraceAnalysisPanel: React.FC = () => {
               backgroundColor: getGlowColor(NODE_COLORS[selectedNode.kind], 0.05),
             }}
           >
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span
                 className="text-xs font-mono font-bold"
                 style={{ color: NODE_COLORS[selectedNode.kind] }}
@@ -640,6 +776,30 @@ export const TraceAnalysisPanel: React.FC = () => {
                   }}
                 >
                   {selectedNode.importance}
+                </span>
+              )}
+              {selectedNode.sourceCredibility && (
+                <span
+                  className="text-xs font-mono px-1 py-0 rounded-sm"
+                  style={{
+                    color: SOURCE_CREDIBILITY_COLORS[selectedNode.sourceCredibility],
+                    backgroundColor: getGlowColor(SOURCE_CREDIBILITY_COLORS[selectedNode.sourceCredibility], 0.1),
+                  }}
+                  title={`来源可信度: ${SOURCE_CREDIBILITY_LABELS[selectedNode.sourceCredibility]}`}
+                >
+                  {SOURCE_CREDIBILITY_LABELS[selectedNode.sourceCredibility]}
+                </span>
+              )}
+              {selectedNode.verificationStatus && (
+                <span
+                  className="text-xs font-mono px-1 py-0 rounded-sm"
+                  style={{
+                    color: VERIFICATION_STATUS_COLORS[selectedNode.verificationStatus],
+                    backgroundColor: getGlowColor(VERIFICATION_STATUS_COLORS[selectedNode.verificationStatus], 0.1),
+                  }}
+                  title={`核验状态: ${VERIFICATION_STATUS_LABELS[selectedNode.verificationStatus]}`}
+                >
+                  {VERIFICATION_STATUS_LABELS[selectedNode.verificationStatus]}
                 </span>
               )}
               {selectedNode.sourceType && (

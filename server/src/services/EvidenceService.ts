@@ -42,6 +42,14 @@ export const EvidenceService = {
       evidence = evidence.filter((e) => e.importance === filter.importance);
     }
 
+    if (filter.sourceCredibility) {
+      evidence = evidence.filter((e) => e.sourceCredibility === filter.sourceCredibility);
+    }
+
+    if (filter.verificationStatus) {
+      evidence = evidence.filter((e) => e.verificationStatus === filter.verificationStatus);
+    }
+
     if (filter.dateRange) {
       const { start, end } = filter.dateRange;
       evidence = evidence.filter((e) => {

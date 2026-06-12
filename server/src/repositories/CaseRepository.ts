@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import db from '../database/index.js';
-import type { Case, CreateCaseDto, UpdateCaseDto, CanvasState, CaseTemplate, CaseSearchFilters, CaseWithAggregatedData, Evidence, CaseOverview, EvidenceCountByImportance, TagDistribution, RecentChange, AuditAction } from '@shared/types';
+import type { Case, CreateCaseDto, UpdateCaseDto, CanvasState, CaseTemplate, CaseSearchFilters, CaseWithAggregatedData, Evidence, CaseOverview, EvidenceCountByImportance, EvidenceCountBySourceCredibility, EvidenceCountByVerificationStatus, TagDistribution, RecentChange, AuditAction, EvidenceSourceCredibility, EvidenceVerificationStatus } from '@shared/types';
 
 interface CaseRow {
   id: string;
@@ -251,17 +251,27 @@ export const CaseRepository = {
     if (!caseData) return null;
 
     const evidenceRows = db.prepare(
-      'SELECT importance, tags FROM evidence WHERE case_id = ? AND deleted_at IS NULL'
-    ).all(caseId) as Array<{ importance: string; tags: string }>;
+      'SELECT importance, source_credibility, verification_status, tags FROM evidence WHERE case_id = ? AND deleted_at IS NULL'
+    ).all(caseId) as Array<{ importance: string; source_credibility: string; verification_status: string; tags: string }>;
 
     const totalEvidence = evidenceRows.length;
     const evidenceByImportance: EvidenceCountByImportance = { low: 0, normal: 0, high: 0, critical: 0 };
+    const evidenceBySourceCredibility: EvidenceCountBySourceCredibility = { very_low: 0, low: 0, medium: 0, high: 0, very_high: 0 };
+    const evidenceByVerificationStatus: EvidenceCountByVerificationStatus = { unverified: 0, pending: 0, verified: 0, failed: 0, disputed: 0 };
     const tagCountMap = new Map<string, number>();
 
     for (const row of evidenceRows) {
       const imp = row.importance as keyof EvidenceCountByImportance;
       if (imp in evidenceByImportance) {
         evidenceByImportance[imp]++;
+      }
+      const cred = row.source_credibility as keyof EvidenceCountBySourceCredibility;
+      if (cred in evidenceBySourceCredibility) {
+        evidenceBySourceCredibility[cred]++;
+      }
+      const ver = row.verification_status as keyof EvidenceCountByVerificationStatus;
+      if (ver in evidenceByVerificationStatus) {
+        evidenceByVerificationStatus[ver]++;
       }
       try {
         const tags = JSON.parse(row.tags) as string[];
@@ -318,6 +328,8 @@ export const CaseRepository = {
       totalConnections,
       totalCollaborators,
       evidenceByImportance,
+      evidenceBySourceCredibility,
+      evidenceByVerificationStatus,
       tagDistribution,
       recentChanges,
       lastUpdatedAt: caseData.updatedAt,

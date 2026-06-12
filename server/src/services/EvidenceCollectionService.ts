@@ -115,10 +115,25 @@ export const EvidenceCollectionService = {
     if (item.verificationStatus !== 'verified') throw new Error('证据未通过校验，不能归档');
     if (item.archivedAt) throw new Error('证据已归档');
 
+    let defaultCredibility: import('@shared/types').EvidenceSourceCredibility = 'medium';
+    switch (item.sourceType) {
+      case 'webpage_screenshot':
+        defaultCredibility = 'medium';
+        break;
+      case 'file_upload':
+        defaultCredibility = 'high';
+        break;
+      case 'manual_entry':
+        defaultCredibility = 'low';
+        break;
+    }
+
     const evidenceDto = {
       caseId: item.caseId,
       content: item.content,
       source: `${item.sourceType}${item.sourceUrl ? ': ' + item.sourceUrl : ''}${item.fileName ? ': ' + item.fileName : ''}`,
+      sourceCredibility: defaultCredibility,
+      verificationStatus: 'verified' as import('@shared/types').EvidenceVerificationStatus,
       importance: item.importance,
       tags: item.tags,
       positionX: 100 + Math.random() * 400,

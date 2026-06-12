@@ -1,6 +1,6 @@
 import React from 'react';
-import { Clock, Globe } from 'lucide-react';
-import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
+import { Clock, Globe, Shield } from 'lucide-react';
+import { CYBERPUNK_COLORS, getGlowColor, SOURCE_CREDIBILITY_COLORS, SOURCE_CREDIBILITY_LABELS } from '@/utils/colorUtils';
 import type { Evidence } from '@/types';
 
 interface CardFooterProps {
@@ -17,6 +17,9 @@ export const CardFooter: React.FC<CardFooterProps> = ({ evidence, zoom }) => {
       minute: '2-digit',
     });
   };
+
+  const credibilityColor = SOURCE_CREDIBILITY_COLORS[evidence.sourceCredibility];
+  const credibilityLabel = SOURCE_CREDIBILITY_LABELS[evidence.sourceCredibility];
 
   return (
     <div
@@ -41,23 +44,49 @@ export const CardFooter: React.FC<CardFooterProps> = ({ evidence, zoom }) => {
           {formatDate(evidence.timestamp)}
         </span>
       </div>
-      {evidence.source && (
-        <div className="flex items-center gap-1 max-w-[50%]">
-          <Globe
+      <div className="flex items-center gap-2">
+        <div
+          className="flex items-center gap-0.5 px-1 rounded-sm"
+          style={{
+            backgroundColor: getGlowColor(credibilityColor, 0.15),
+          }}
+          title={`来源可信度: ${credibilityLabel}`}
+        >
+          <Shield
             size={10 / zoom}
-            style={{ color: CYBERPUNK_COLORS.textSecondary, flexShrink: 0 }}
+            style={{
+              color: credibilityColor,
+              filter: `drop-shadow(0 0 2px ${getGlowColor(credibilityColor, 0.6)})`,
+            }}
           />
           <span
-            className="font-mono truncate"
+            className="font-mono"
             style={{
-              fontSize: `${9 / zoom}px`,
-              color: CYBERPUNK_COLORS.textSecondary,
+              fontSize: `${8 / zoom}px`,
+              color: credibilityColor,
             }}
           >
-            {evidence.source}
+            {credibilityLabel}
           </span>
         </div>
-      )}
+        {evidence.source && (
+          <div className="flex items-center gap-1 max-w-[40%]">
+            <Globe
+              size={10 / zoom}
+              style={{ color: CYBERPUNK_COLORS.textSecondary, flexShrink: 0 }}
+            />
+            <span
+              className="font-mono truncate"
+              style={{
+                fontSize: `${9 / zoom}px`,
+                color: CYBERPUNK_COLORS.textSecondary,
+              }}
+            >
+              {evidence.source}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -42,6 +42,8 @@ export const Sidebar: React.FC = () => {
       caseId: currentCase.id,
       content: '新证据',
       source: '手动添加',
+      sourceCredibility: 'medium',
+      verificationStatus: 'unverified',
       importance: 'normal',
       tags: [],
       positionX: 100 + Math.random() * 200,

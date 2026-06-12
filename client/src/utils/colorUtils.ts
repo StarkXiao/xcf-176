@@ -1,4 +1,5 @@
 import type { ImportanceLevel } from '@/types';
+import type { EvidenceSourceCredibility, EvidenceVerificationStatus } from '../../../shared/types';
 
 export const CYBERPUNK_COLORS = {
   bgPrimary: '#0a0a0f',
@@ -9,6 +10,7 @@ export const CYBERPUNK_COLORS = {
   accentYellow: '#ffcc00',
   accentGreen: '#00ff88',
   accentPurple: '#9945ff',
+  accentOrange: '#ff8800',
   textPrimary: '#e0e0e0',
   textSecondary: '#888899',
   borderColor: '#2a2a3a',
@@ -21,6 +23,38 @@ export const IMPORTANCE_COLORS: Record<ImportanceLevel, string> = {
   normal: CYBERPUNK_COLORS.accentCyan,
   high: CYBERPUNK_COLORS.accentYellow,
   critical: CYBERPUNK_COLORS.accentRed,
+};
+
+export const SOURCE_CREDIBILITY_COLORS: Record<EvidenceSourceCredibility, string> = {
+  very_low: '#ff4444',
+  low: '#ff8844',
+  medium: '#ffcc00',
+  high: '#88cc44',
+  very_high: '#00ff88',
+};
+
+export const VERIFICATION_STATUS_COLORS: Record<EvidenceVerificationStatus, string> = {
+  unverified: '#888899',
+  pending: '#ffcc00',
+  verified: '#00ff88',
+  failed: '#ff4444',
+  disputed: '#ff8800',
+};
+
+export const SOURCE_CREDIBILITY_LABELS: Record<EvidenceSourceCredibility, string> = {
+  very_low: '极低',
+  low: '低',
+  medium: '中',
+  high: '高',
+  very_high: '极高',
+};
+
+export const VERIFICATION_STATUS_LABELS: Record<EvidenceVerificationStatus, string> = {
+  unverified: '未核验',
+  pending: '核验中',
+  verified: '已核验',
+  failed: '核验失败',
+  disputed: '有争议',
 };
 
 export function hexToRgb(hex: string): { r: number; g: number; b: number } | null {

@@ -18,6 +18,8 @@ import type {
   CreateReportDto,
   Evidence,
   TaskStatus,
+  EvidenceSourceCredibility,
+  EvidenceVerificationStatus,
 } from '@shared/types';
 
 function buildCaseSummary(caseId: string): ReportCaseSummary {
@@ -37,6 +39,20 @@ function buildCaseSummary(caseId: string): ReportCaseSummary {
     high: 0,
     critical: 0,
   };
+  const evidenceBySourceCredibility: Record<EvidenceSourceCredibility, number> = {
+    very_low: 0,
+    low: 0,
+    medium: 0,
+    high: 0,
+    very_high: 0,
+  };
+  const evidenceByVerificationStatus: Record<EvidenceVerificationStatus, number> = {
+    unverified: 0,
+    pending: 0,
+    verified: 0,
+    failed: 0,
+    disputed: 0,
+  };
   const evidenceByStatus: Record<TaskStatus, number> = {
     pending: 0,
     in_progress: 0,
@@ -46,6 +62,8 @@ function buildCaseSummary(caseId: string): ReportCaseSummary {
 
   evidence.forEach((e) => {
     evidenceByImportance[e.importance]++;
+    evidenceBySourceCredibility[e.sourceCredibility]++;
+    evidenceByVerificationStatus[e.verificationStatus]++;
     evidenceByStatus[e.status]++;
   });
 
@@ -59,6 +77,8 @@ function buildCaseSummary(caseId: string): ReportCaseSummary {
     totalConnections: connections.length,
     totalTasks: tasks.length,
     evidenceByImportance,
+    evidenceBySourceCredibility,
+    evidenceByVerificationStatus,
     evidenceByStatus,
     collaborators: collaborators.map((c) => ({
       id: c.id,
@@ -79,6 +99,8 @@ function buildRelationshipGraph(caseId: string): ReportRelationshipGraph {
     id: e.id,
     content: e.content,
     source: e.source,
+    sourceCredibility: e.sourceCredibility,
+    verificationStatus: e.verificationStatus,
     importance: e.importance,
     tags: e.tags,
     status: e.status,
@@ -212,6 +234,20 @@ function generateMarkdownExport(report: Report): string {
   }
   lines.push('');
 
+  lines.push('### 来源可信度分布');
+  lines.push('');
+  for (const [level, count] of Object.entries(s.evidenceBySourceCredibility)) {
+    if (count > 0) lines.push(`- ${level}: ${count}`);
+  }
+  lines.push('');
+
+  lines.push('### 核验状态分布');
+  lines.push('');
+  for (const [status, count] of Object.entries(s.evidenceByVerificationStatus)) {
+    if (count > 0) lines.push(`- ${status}: ${count}`);
+  }
+  lines.push('');
+
   lines.push('### 证据状态分布');
   lines.push('');
   for (const [status, count] of Object.entries(s.evidenceByStatus)) {
@@ -232,7 +268,7 @@ function generateMarkdownExport(report: Report): string {
   lines.push('');
   report.relationshipGraph.nodes.forEach((n, i) => {
     lines.push(`${i + 1}. **[${n.importance}]** ${n.content.slice(0, 80)}`);
-    lines.push(`   - 来源: ${n.source} | 状态: ${n.status} | 标签: ${n.tags.join(', ') || '无'}`);
+    lines.push(`   - 来源: ${n.source} | 可信度: ${n.sourceCredibility} | 核验: ${n.verificationStatus} | 状态: ${n.status} | 标签: ${n.tags.join(', ') || '无'}`);
   });
   lines.push('');
 
@@ -274,6 +310,22 @@ function generateHtmlExport(report: Report): string {
     low: '#6b7280',
   };
 
+  const credibilityColor: Record<string, string> = {
+    very_low: '#ff4444',
+    low: '#ff8844',
+    medium: '#ffcc00',
+    high: '#88cc44',
+    very_high: '#00ff88',
+  };
+
+  const verificationColor: Record<string, string> = {
+    unverified: '#888899',
+    pending: '#ffcc00',
+    verified: '#00ff88',
+    failed: '#ff4444',
+    disputed: '#ff8800',
+  };
+
   const statusLabel: Record<string, string> = {
     pending: '待处理',
     in_progress: '进行中',
@@ -305,6 +357,16 @@ function generateHtmlExport(report: Report): string {
   .badge-high { background: #ef444433; color: #ef4444; border: 1px solid #ef444455; }
   .badge-normal { background: #3b82f633; color: #3b82f6; border: 1px solid #3b82f655; }
   .badge-low { background: #6b728033; color: #6b7280; border: 1px solid #6b728055; }
+  .cred-very_low { background: #ff444433; color: #ff4444; border: 1px solid #ff444455; }
+  .cred-low { background: #ff884433; color: #ff8844; border: 1px solid #ff884455; }
+  .cred-medium { background: #ffcc0033; color: #ffcc00; border: 1px solid #ffcc0055; }
+  .cred-high { background: #88cc4433; color: #88cc44; border: 1px solid #88cc4455; }
+  .cred-very_high { background: #00ff8833; color: #00ff88; border: 1px solid #00ff8855; }
+  .ver-unverified { background: #88889933; color: #888899; border: 1px solid #88889955; }
+  .ver-pending { background: #ffcc0033; color: #ffcc00; border: 1px solid #ffcc0055; }
+  .ver-verified { background: #00ff8833; color: #00ff88; border: 1px solid #00ff8855; }
+  .ver-failed { background: #ff444433; color: #ff4444; border: 1px solid #ff444455; }
+  .ver-disputed { background: #ff880033; color: #ff8800; border: 1px solid #ff880055; }
   table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
   th { background: #1a1a2e; color: #00f0ff; padding: 8px 12px; text-align: left; border-bottom: 1px solid #2a2a3e; }
   td { padding: 8px 12px; border-bottom: 1px solid #1a1a2e; }
@@ -343,6 +405,18 @@ function generateHtmlExport(report: Report): string {
     ${Object.entries(s.evidenceByImportance).filter(([, v]) => v > 0).map(([k, v]) => `<tr><td><span class="badge badge-${k}">${k}</span></td><td>${v}</td></tr>`).join('')}
   </table>
 
+  <h3>来源可信度分布</h3>
+  <table>
+    <tr><th>可信度</th><th>数量</th></tr>
+    ${Object.entries(s.evidenceBySourceCredibility).filter(([, v]) => v > 0).map(([k, v]) => `<tr><td><span class="badge cred-${k}">${k}</span></td><td>${v}</td></tr>`).join('')}
+  </table>
+
+  <h3>核验状态分布</h3>
+  <table>
+    <tr><th>核验状态</th><th>数量</th></tr>
+    ${Object.entries(s.evidenceByVerificationStatus).filter(([, v]) => v > 0).map(([k, v]) => `<tr><td><span class="badge ver-${k}">${k}</span></td><td>${v}</td></tr>`).join('')}
+  </table>
+
   <h3>证据状态分布</h3>
   <table>
     <tr><th>状态</th><th>数量</th></tr>
@@ -360,8 +434,8 @@ function generateHtmlExport(report: Report): string {
 
   <h3>证据节点 (${report.relationshipGraph.nodes.length})</h3>
   <table>
-    <tr><th>#</th><th>重要性</th><th>内容</th><th>来源</th><th>状态</th><th>标签</th></tr>
-    ${report.relationshipGraph.nodes.map((n, i) => `<tr><td>${i + 1}</td><td><span class="badge badge-${n.importance}">${n.importance}</span></td><td>${esc(n.content.slice(0, 60))}</td><td>${esc(n.source)}</td><td>${statusLabel[n.status] ?? n.status}</td><td>${n.tags.map((t) => `<span class="clue-tag">${esc(t)}</span>`).join(' ')}</td></tr>`).join('')}
+    <tr><th>#</th><th>重要性</th><th>内容</th><th>来源</th><th>可信度</th><th>核验状态</th><th>状态</th><th>标签</th></tr>
+    ${report.relationshipGraph.nodes.map((n, i) => `<tr><td>${i + 1}</td><td><span class="badge badge-${n.importance}">${n.importance}</span></td><td>${esc(n.content.slice(0, 40))}</td><td>${esc(n.source)}</td><td><span class="badge cred-${n.sourceCredibility}">${n.sourceCredibility}</span></td><td><span class="badge ver-${n.verificationStatus}">${n.verificationStatus}</span></td><td>${statusLabel[n.status] ?? n.status}</td><td>${n.tags.map((t) => `<span class="clue-tag">${esc(t)}</span>`).join(' ')}</td></tr>`).join('')}
   </table>
 
   <h3>关联关系 (${report.relationshipGraph.edges.length})</h3>

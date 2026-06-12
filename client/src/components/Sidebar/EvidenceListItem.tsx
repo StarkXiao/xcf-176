@@ -1,9 +1,9 @@
 import React from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Shield, ShieldCheck } from 'lucide-react';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { GlowBorder } from '@/components/ui/GlowBorder';
 import { useCollaboratorStore } from '@/store/useCollaboratorStore';
-import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
+import { CYBERPUNK_COLORS, getGlowColor, SOURCE_CREDIBILITY_COLORS, SOURCE_CREDIBILITY_LABELS, VERIFICATION_STATUS_COLORS, VERIFICATION_STATUS_LABELS } from '@/utils/colorUtils';
 import type { Evidence, TaskStatus } from '@/types';
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -38,6 +38,10 @@ export const EvidenceListItem: React.FC<EvidenceListItemProps> = ({
   const getCollaboratorById = useCollaboratorStore((s) => s.getCollaboratorById);
   const assignedCollaborator = evidence.assignedTo ? getCollaboratorById(evidence.assignedTo) : null;
   const statusColor = STATUS_COLORS[evidence.status];
+  const credibilityColor = SOURCE_CREDIBILITY_COLORS[evidence.sourceCredibility];
+  const credibilityLabel = SOURCE_CREDIBILITY_LABELS[evidence.sourceCredibility];
+  const verificationColor = VERIFICATION_STATUS_COLORS[evidence.verificationStatus];
+  const verificationLabel = VERIFICATION_STATUS_LABELS[evidence.verificationStatus];
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('zh-CN', {
@@ -125,6 +129,53 @@ export const EvidenceListItem: React.FC<EvidenceListItemProps> = ({
                       +{evidence.tags.length - 2}
                     </span>
                   )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className="flex items-center gap-0.5 px-1 rounded-sm"
+                    style={{
+                      backgroundColor: getGlowColor(credibilityColor, 0.15),
+                    }}
+                    title={`来源可信度: ${credibilityLabel}`}
+                  >
+                    <Shield
+                      size={9}
+                      style={{ color: credibilityColor }}
+                    />
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: '8px',
+                        color: credibilityColor,
+                      }}
+                    >
+                      {credibilityLabel}
+                    </span>
+                  </div>
+                  <div
+                    className="flex items-center gap-0.5 px-1 rounded-sm"
+                    style={{
+                      backgroundColor: getGlowColor(verificationColor, 0.15),
+                    }}
+                    title={`核验状态: ${verificationLabel}`}
+                  >
+                    <ShieldCheck
+                      size={9}
+                      style={{ color: verificationColor }}
+                    />
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: '8px',
+                        color: verificationColor,
+                      }}
+                    >
+                      {verificationLabel}
+                    </span>
+                  </div>
                 </div>
                 <span
                   className="text-xs font-mono"

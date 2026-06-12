@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Trash2, Palette, UserCheck, Activity } from 'lucide-react';
+import { Trash2, Palette, UserCheck, Activity, Shield, ShieldCheck } from 'lucide-react';
 import { NeonInput } from '@/components/ui/NeonInput';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { TagEditor } from './TagEditor';
@@ -10,9 +10,13 @@ import {
   CYBERPUNK_COLORS,
   getGlowColor,
   IMPORTANCE_COLORS,
+  SOURCE_CREDIBILITY_COLORS,
+  SOURCE_CREDIBILITY_LABELS,
+  VERIFICATION_STATUS_COLORS,
+  VERIFICATION_STATUS_LABELS,
 } from '@/utils/colorUtils';
 import { recordAuditLog } from '@/utils/auditHelper';
-import type { Evidence, ImportanceLevel, TaskStatus } from '@/types';
+import type { Evidence, ImportanceLevel, TaskStatus, EvidenceSourceCredibility, EvidenceVerificationStatus } from '@/types';
 
 interface EvidenceEditorProps {
   evidence: Evidence;
@@ -23,6 +27,22 @@ const importanceOptions: Array<{ value: ImportanceLevel; label: string }> = [
   { value: 'normal', label: '中' },
   { value: 'high', label: '高' },
   { value: 'critical', label: '紧急' },
+];
+
+const credibilityOptions: Array<{ value: EvidenceSourceCredibility; label: string }> = [
+  { value: 'very_low', label: '极低' },
+  { value: 'low', label: '低' },
+  { value: 'medium', label: '中' },
+  { value: 'high', label: '高' },
+  { value: 'very_high', label: '极高' },
+];
+
+const verificationOptions: Array<{ value: EvidenceVerificationStatus; label: string }> = [
+  { value: 'unverified', label: '未核验' },
+  { value: 'pending', label: '核验中' },
+  { value: 'verified', label: '已核验' },
+  { value: 'failed', label: '核验失败' },
+  { value: 'disputed', label: '有争议' },
 ];
 
 const colorOptions = [
@@ -111,6 +131,70 @@ export const EvidenceEditor: React.FC<EvidenceEditorProps> = ({ evidence }) => {
                   boxShadow: isActive ? `0 0 10px ${getGlowColor(color, 0.4)}` : 'none',
                 }}
                 onClick={() => handleFieldChange('importance', option.value)}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label
+          className="block text-xs font-mono uppercase tracking-wider flex items-center gap-2"
+          style={{ color: CYBERPUNK_COLORS.textSecondary }}
+        >
+          <Shield size={14} />
+          来源可信度
+        </label>
+        <div className="flex gap-2">
+          {credibilityOptions.map((option) => {
+            const isActive = evidence.sourceCredibility === option.value;
+            const color = SOURCE_CREDIBILITY_COLORS[option.value];
+            return (
+              <button
+                key={option.value}
+                className="flex-1 px-3 py-2 text-xs font-mono border rounded-sm transition-all"
+                style={{
+                  borderColor: isActive ? color : CYBERPUNK_COLORS.borderColor,
+                  color: isActive ? color : CYBERPUNK_COLORS.textSecondary,
+                  backgroundColor: isActive ? getGlowColor(color, 0.1) : 'transparent',
+                  boxShadow: isActive ? `0 0 10px ${getGlowColor(color, 0.4)}` : 'none',
+                }}
+                onClick={() => handleFieldChange('sourceCredibility', option.value)}
+                title={SOURCE_CREDIBILITY_LABELS[option.value]}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label
+          className="block text-xs font-mono uppercase tracking-wider flex items-center gap-2"
+          style={{ color: CYBERPUNK_COLORS.textSecondary }}
+        >
+          <ShieldCheck size={14} />
+          核验状态
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {verificationOptions.map((option) => {
+            const isActive = evidence.verificationStatus === option.value;
+            const color = VERIFICATION_STATUS_COLORS[option.value];
+            return (
+              <button
+                key={option.value}
+                className="flex-1 px-2 py-2 text-xs font-mono border rounded-sm transition-all min-w-[70px]"
+                style={{
+                  borderColor: isActive ? color : CYBERPUNK_COLORS.borderColor,
+                  color: isActive ? color : CYBERPUNK_COLORS.textSecondary,
+                  backgroundColor: isActive ? getGlowColor(color, 0.1) : 'transparent',
+                  boxShadow: isActive ? `0 0 10px ${getGlowColor(color, 0.4)}` : 'none',
+                }}
+                onClick={() => handleFieldChange('verificationStatus', option.value)}
+                title={VERIFICATION_STATUS_LABELS[option.value]}
               >
                 {option.label}
               </button>

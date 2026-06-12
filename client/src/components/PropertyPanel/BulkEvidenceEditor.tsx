@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Layers, Tag, FileText, AlertTriangle, Check, X, Plus, Loader2 } from 'lucide-react';
+import { Layers, Tag, FileText, AlertTriangle, Check, X, Plus, Loader2, Shield, ShieldCheck } from 'lucide-react';
 import { NeonInput } from '@/components/ui/NeonInput';
 import { NeonButton } from '@/components/ui/NeonButton';
 import { TagEditor } from './TagEditor';
@@ -7,9 +7,9 @@ import { useEvidenceStore } from '@/store/useEvidenceStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import { useUiStore } from '@/store/useUiStore';
 import { useCollaboratorStore } from '@/store/useCollaboratorStore';
-import { CYBERPUNK_COLORS, getGlowColor, IMPORTANCE_COLORS } from '@/utils/colorUtils';
+import { CYBERPUNK_COLORS, getGlowColor, IMPORTANCE_COLORS, SOURCE_CREDIBILITY_COLORS, SOURCE_CREDIBILITY_LABELS, VERIFICATION_STATUS_COLORS, VERIFICATION_STATUS_LABELS } from '@/utils/colorUtils';
 import { recordAuditLog } from '@/utils/auditHelper';
-import type { Evidence, UpdateEvidenceDto, ImportanceLevel } from '@/types';
+import type { Evidence, UpdateEvidenceDto, ImportanceLevel, EvidenceSourceCredibility, EvidenceVerificationStatus } from '@/types';
 
 interface BulkEvidenceEditorProps {
   evidenceIds: string[];
@@ -23,6 +23,22 @@ const importanceOptions: Array<{ value: ImportanceLevel; label: string }> = [
   { value: 'normal', label: '中' },
   { value: 'high', label: '高' },
   { value: 'critical', label: '紧急' },
+];
+
+const credibilityOptions: Array<{ value: EvidenceSourceCredibility; label: string }> = [
+  { value: 'very_low', label: '极低' },
+  { value: 'low', label: '低' },
+  { value: 'medium', label: '中' },
+  { value: 'high', label: '高' },
+  { value: 'very_high', label: '极高' },
+];
+
+const verificationOptions: Array<{ value: EvidenceVerificationStatus; label: string }> = [
+  { value: 'unverified', label: '未核验' },
+  { value: 'pending', label: '核验中' },
+  { value: 'verified', label: '已核验' },
+  { value: 'failed', label: '核验失败' },
+  { value: 'disputed', label: '有争议' },
 ];
 
 export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidenceIds }) => {
@@ -47,6 +63,12 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
   const [importanceChangeType, setImportanceChangeType] = useState<FieldChangeType>('none');
   const [importanceValue, setImportanceValue] = useState<ImportanceLevel>('normal');
 
+  const [credibilityChangeType, setCredibilityChangeType] = useState<FieldChangeType>('none');
+  const [credibilityValue, setCredibilityValue] = useState<EvidenceSourceCredibility>('medium');
+
+  const [verificationChangeType, setVerificationChangeType] = useState<FieldChangeType>('none');
+  const [verificationValue, setVerificationValue] = useState<EvidenceVerificationStatus>('unverified');
+
   const [tagOperation, setTagOperation] = useState<TagOperation>('add');
   const [tagValue, setTagValue] = useState<string[]>([]);
 
@@ -56,11 +78,15 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
   const summary = useMemo(() => {
     const sources = new Set<string>();
     const importances = new Set<ImportanceLevel>();
+    const credibilities = new Set<EvidenceSourceCredibility>();
+    const verifications = new Set<EvidenceVerificationStatus>();
     const allTags = new Set<string>();
 
     selectedEvidence.forEach((e) => {
       if (e.source) sources.add(e.source);
       importances.add(e.importance);
+      credibilities.add(e.sourceCredibility);
+      verifications.add(e.verificationStatus);
       e.tags.forEach((t) => allTags.add(t));
     });
 
@@ -68,6 +94,8 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
       count: selectedEvidence.length,
       sources: Array.from(sources),
       importances: Array.from(importances),
+      credibilities: Array.from(credibilities),
+      verifications: Array.from(verifications),
       allTags: Array.from(allTags),
     };
   }, [selectedEvidence]);
@@ -78,6 +106,8 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
     const hasChanges =
       sourceChangeType !== 'none' ||
       importanceChangeType !== 'none' ||
+      credibilityChangeType !== 'none' ||
+      verificationChangeType !== 'none' ||
       (tagValue.length > 0 && tagOperation !== 'replace' ? true : tagOperation === 'replace');
 
     if (!hasChanges) {
@@ -100,6 +130,14 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
 
         if (importanceChangeType === 'set') {
           data.importance = importanceValue;
+        }
+
+        if (credibilityChangeType === 'set') {
+          data.sourceCredibility = credibilityValue;
+        }
+
+        if (verificationChangeType === 'set') {
+          data.verificationStatus = verificationValue;
         }
 
         if (tagOperation === 'replace') {
@@ -135,6 +173,14 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
         const impLabel = importanceOptions.find((o) => o.value === importanceValue)?.label;
         changeDetails.push(`重要性→${impLabel}`);
       }
+      if (credibilityChangeType === 'set') {
+        const credLabel = credibilityOptions.find((o) => o.value === credibilityValue)?.label;
+        changeDetails.push(`可信度→${credLabel}`);
+      }
+      if (verificationChangeType === 'set') {
+        const verLabel = verificationOptions.find((o) => o.value === verificationValue)?.label;
+        changeDetails.push(`核验状态→${verLabel}`);
+      }
       if (tagValue.length > 0) {
         const opLabel = tagOperation === 'replace' ? '替换标签' : tagOperation === 'add' ? '添加标签' : '移除标签';
         changeDetails.push(`${opLabel} [${tagValue.join(', ')}]`);
@@ -155,6 +201,8 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
       setSourceChangeType('none');
       setSourceValue('');
       setImportanceChangeType('none');
+      setCredibilityChangeType('none');
+      setVerificationChangeType('none');
       setTagOperation('add');
       setTagValue([]);
     } catch (error) {
@@ -171,6 +219,10 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
     sourceValue,
     importanceChangeType,
     importanceValue,
+    credibilityChangeType,
+    credibilityValue,
+    verificationChangeType,
+    verificationValue,
     tagOperation,
     tagValue,
     bulkUpdateEvidence,
@@ -241,6 +293,28 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
               {summary.importances.length === 1
                 ? importanceOptions.find((o) => o.value === summary.importances[0])?.label
                 : `${summary.importances.length} 种混合`}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <Shield size={12} style={{ color: CYBERPUNK_COLORS.textSecondary, marginTop: 2 }} />
+          <div>
+            <span style={{ color: CYBERPUNK_COLORS.textSecondary }}>可信度: </span>
+            <span style={{ color: CYBERPUNK_COLORS.textPrimary }}>
+              {summary.credibilities.length === 1
+                ? SOURCE_CREDIBILITY_LABELS[summary.credibilities[0]]
+                : `${summary.credibilities.length} 种混合`}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <ShieldCheck size={12} style={{ color: CYBERPUNK_COLORS.textSecondary, marginTop: 2 }} />
+          <div>
+            <span style={{ color: CYBERPUNK_COLORS.textSecondary }}>核验状态: </span>
+            <span style={{ color: CYBERPUNK_COLORS.textPrimary }}>
+              {summary.verifications.length === 1
+                ? VERIFICATION_STATUS_LABELS[summary.verifications[0]]
+                : `${summary.verifications.length} 种混合`}
             </span>
           </div>
         </div>
@@ -356,6 +430,134 @@ export const BulkEvidenceEditor: React.FC<BulkEvidenceEditorProps> = ({ evidence
                     boxShadow: isActive ? `0 0 10px ${getGlowColor(color, 0.4)}` : 'none',
                   }}
                   onClick={() => setImportanceValue(option.value)}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label
+            className="text-xs font-mono uppercase tracking-wider flex items-center gap-2"
+            style={{ color: CYBERPUNK_COLORS.textSecondary }}
+          >
+            <Shield size={14} />
+            来源可信度
+          </label>
+          <div className="flex gap-1">
+            <button
+              className={`px-2 py-0.5 text-xs font-mono rounded-sm border transition-all ${
+                credibilityChangeType === 'none' ? 'opacity-100' : 'opacity-50'
+              }`}
+              style={{
+                borderColor: credibilityChangeType === 'none' ? CYBERPUNK_COLORS.accentCyan : CYBERPUNK_COLORS.borderColor,
+                color: credibilityChangeType === 'none' ? CYBERPUNK_COLORS.accentCyan : CYBERPUNK_COLORS.textSecondary,
+                backgroundColor: credibilityChangeType === 'none' ? getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.1) : 'transparent',
+              }}
+              onClick={() => setCredibilityChangeType('none')}
+            >
+              不改
+            </button>
+            <button
+              className={`px-2 py-0.5 text-xs font-mono rounded-sm border transition-all ${
+                credibilityChangeType === 'set' ? 'opacity-100' : 'opacity-50'
+              }`}
+              style={{
+                borderColor: credibilityChangeType === 'set' ? CYBERPUNK_COLORS.accentGreen : CYBERPUNK_COLORS.borderColor,
+                color: credibilityChangeType === 'set' ? CYBERPUNK_COLORS.accentGreen : CYBERPUNK_COLORS.textSecondary,
+                backgroundColor: credibilityChangeType === 'set' ? getGlowColor(CYBERPUNK_COLORS.accentGreen, 0.1) : 'transparent',
+              }}
+              onClick={() => setCredibilityChangeType('set')}
+            >
+              设置
+            </button>
+          </div>
+        </div>
+        {credibilityChangeType === 'set' && (
+          <div className="flex gap-2">
+            {credibilityOptions.map((option) => {
+              const isActive = credibilityValue === option.value;
+              const color = SOURCE_CREDIBILITY_COLORS[option.value];
+              return (
+                <button
+                  key={option.value}
+                  className="flex-1 px-2 py-2 text-xs font-mono border rounded-sm transition-all"
+                  style={{
+                    borderColor: isActive ? color : CYBERPUNK_COLORS.borderColor,
+                    color: isActive ? color : CYBERPUNK_COLORS.textSecondary,
+                    backgroundColor: isActive ? getGlowColor(color, 0.1) : 'transparent',
+                    boxShadow: isActive ? `0 0 10px ${getGlowColor(color, 0.4)}` : 'none',
+                  }}
+                  onClick={() => setCredibilityValue(option.value)}
+                  title={SOURCE_CREDIBILITY_LABELS[option.value]}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label
+            className="text-xs font-mono uppercase tracking-wider flex items-center gap-2"
+            style={{ color: CYBERPUNK_COLORS.textSecondary }}
+          >
+            <ShieldCheck size={14} />
+            核验状态
+          </label>
+          <div className="flex gap-1">
+            <button
+              className={`px-2 py-0.5 text-xs font-mono rounded-sm border transition-all ${
+                verificationChangeType === 'none' ? 'opacity-100' : 'opacity-50'
+              }`}
+              style={{
+                borderColor: verificationChangeType === 'none' ? CYBERPUNK_COLORS.accentCyan : CYBERPUNK_COLORS.borderColor,
+                color: verificationChangeType === 'none' ? CYBERPUNK_COLORS.accentCyan : CYBERPUNK_COLORS.textSecondary,
+                backgroundColor: verificationChangeType === 'none' ? getGlowColor(CYBERPUNK_COLORS.accentCyan, 0.1) : 'transparent',
+              }}
+              onClick={() => setVerificationChangeType('none')}
+            >
+              不改
+            </button>
+            <button
+              className={`px-2 py-0.5 text-xs font-mono rounded-sm border transition-all ${
+                verificationChangeType === 'set' ? 'opacity-100' : 'opacity-50'
+              }`}
+              style={{
+                borderColor: verificationChangeType === 'set' ? CYBERPUNK_COLORS.accentGreen : CYBERPUNK_COLORS.borderColor,
+                color: verificationChangeType === 'set' ? CYBERPUNK_COLORS.accentGreen : CYBERPUNK_COLORS.textSecondary,
+                backgroundColor: verificationChangeType === 'set' ? getGlowColor(CYBERPUNK_COLORS.accentGreen, 0.1) : 'transparent',
+              }}
+              onClick={() => setVerificationChangeType('set')}
+            >
+              设置
+            </button>
+          </div>
+        </div>
+        {verificationChangeType === 'set' && (
+          <div className="flex flex-wrap gap-2">
+            {verificationOptions.map((option) => {
+              const isActive = verificationValue === option.value;
+              const color = VERIFICATION_STATUS_COLORS[option.value];
+              return (
+                <button
+                  key={option.value}
+                  className="flex-1 px-2 py-2 text-xs font-mono border rounded-sm transition-all min-w-[70px]"
+                  style={{
+                    borderColor: isActive ? color : CYBERPUNK_COLORS.borderColor,
+                    color: isActive ? color : CYBERPUNK_COLORS.textSecondary,
+                    backgroundColor: isActive ? getGlowColor(color, 0.1) : 'transparent',
+                    boxShadow: isActive ? `0 0 10px ${getGlowColor(color, 0.4)}` : 'none',
+                  }}
+                  onClick={() => setVerificationValue(option.value)}
+                  title={VERIFICATION_STATUS_LABELS[option.value]}
                 >
                   {option.label}
                 </button>

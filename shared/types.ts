@@ -19,11 +19,16 @@ export interface Case {
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'reviewed';
 
+export type EvidenceSourceCredibility = 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+export type EvidenceVerificationStatus = 'unverified' | 'pending' | 'verified' | 'failed' | 'disputed';
+
 export interface Evidence {
   id: string;
   caseId: string;
   content: string;
   source: string;
+  sourceCredibility: EvidenceSourceCredibility;
+  verificationStatus: EvidenceVerificationStatus;
   importance: 'low' | 'normal' | 'high' | 'critical';
   tags: string[];
   positionX: number;
@@ -67,6 +72,8 @@ export interface SearchFilter {
   keyword: string;
   tags: string[];
   importance?: Evidence['importance'];
+  sourceCredibility?: EvidenceSourceCredibility;
+  verificationStatus?: EvidenceVerificationStatus;
   dateRange?: { start: string; end: string };
 }
 
@@ -277,6 +284,8 @@ export interface CreateEvidenceDto {
   caseId: string;
   content: string;
   source?: string;
+  sourceCredibility?: EvidenceSourceCredibility;
+  verificationStatus?: EvidenceVerificationStatus;
   importance?: Evidence['importance'];
   tags?: string[];
   positionX?: number;
@@ -292,6 +301,8 @@ export interface CreateEvidenceDto {
 export interface UpdateEvidenceDto {
   content?: string;
   source?: string;
+  sourceCredibility?: EvidenceSourceCredibility;
+  verificationStatus?: EvidenceVerificationStatus;
   importance?: Evidence['importance'];
   tags?: string[];
   positionX?: number;
@@ -456,7 +467,7 @@ export interface CreateCollectionItemDto {
 
 export type TraceNodeKind = 'evidence' | 'collection' | 'audit';
 export type TraceEdgeKind = 'connection' | 'temporal' | 'source' | 'dedup';
-export type TracePerspective = 'timeline' | 'source' | 'relationship' | 'importance';
+export type TracePerspective = 'timeline' | 'source' | 'relationship' | 'importance' | 'credibility' | 'verification';
 
 export interface TraceNode {
   id: string;
@@ -465,6 +476,8 @@ export interface TraceNode {
   timestamp: string;
   sourceType?: EvidenceSourceType;
   importance?: Evidence['importance'];
+  sourceCredibility?: EvidenceSourceCredibility;
+  verificationStatus?: EvidenceVerificationStatus;
   referenceId: string;
   tags: string[];
   collaboratorName?: string;
@@ -557,6 +570,8 @@ export interface ReportEvidenceSummary {
   id: string;
   content: string;
   source: string;
+  sourceCredibility: EvidenceSourceCredibility;
+  verificationStatus: EvidenceVerificationStatus;
   importance: Evidence['importance'];
   tags: string[];
   status: TaskStatus;
@@ -604,6 +619,8 @@ export interface ReportCaseSummary {
   totalConnections: number;
   totalTasks: number;
   evidenceByImportance: Record<Evidence['importance'], number>;
+  evidenceBySourceCredibility: Record<EvidenceSourceCredibility, number>;
+  evidenceByVerificationStatus: Record<EvidenceVerificationStatus, number>;
   evidenceByStatus: Record<TaskStatus, number>;
   collaborators: Array<{ id: string; name: string; role: string }>;
 }
@@ -1088,6 +1105,22 @@ export interface EvidenceCountByImportance {
   critical: number;
 }
 
+export interface EvidenceCountBySourceCredibility {
+  very_low: number;
+  low: number;
+  medium: number;
+  high: number;
+  very_high: number;
+}
+
+export interface EvidenceCountByVerificationStatus {
+  unverified: number;
+  pending: number;
+  verified: number;
+  failed: number;
+  disputed: number;
+}
+
 export interface TagDistribution {
   tag: string;
   count: number;
@@ -1109,6 +1142,8 @@ export interface CaseOverview {
   totalConnections: number;
   totalCollaborators: number;
   evidenceByImportance: EvidenceCountByImportance;
+  evidenceBySourceCredibility: EvidenceCountBySourceCredibility;
+  evidenceByVerificationStatus: EvidenceCountByVerificationStatus;
   tagDistribution: TagDistribution[];
   recentChanges: RecentChange[];
   lastUpdatedAt: string;

@@ -39,6 +39,8 @@ export interface SearchFilters {
   keyword: string;
   tags: string[];
   importance?: ImportanceLevel;
+  sourceCredibility?: import('../../../shared/types').EvidenceSourceCredibility;
+  verificationStatus?: import('../../../shared/types').EvidenceVerificationStatus;
 }
 
 export interface DraggedEvidence {

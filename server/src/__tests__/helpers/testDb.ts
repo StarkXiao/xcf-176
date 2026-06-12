@@ -192,17 +192,21 @@ export function seedTestEvidence(
     status: string;
     timestamp?: string;
     assignedTo?: string;
+    sourceCredibility?: string;
+    verificationStatus?: string;
   }>
 ): void {
   const now = new Date().toISOString();
   for (const e of evidence) {
     db.prepare(
-      "INSERT OR IGNORE INTO evidence (id, case_id, content, source, importance, tags, status, timestamp, assigned_to, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT OR IGNORE INTO evidence (id, case_id, content, source, source_credibility, verification_status, importance, tags, status, timestamp, assigned_to, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       e.id,
       caseId,
       e.content,
       e.source,
+      e.sourceCredibility ?? 'medium',
+      e.verificationStatus ?? 'unverified',
       e.importance,
       JSON.stringify(e.tags),
       e.status,

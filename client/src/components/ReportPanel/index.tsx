@@ -18,7 +18,7 @@ import {
 import { useReportStore } from '@/store/useReportStore';
 import { useCaseStore } from '@/store/useCaseStore';
 import { useUiStore } from '@/store/useUiStore';
-import { CYBERPUNK_COLORS, getGlowColor, IMPORTANCE_COLORS } from '@/utils/colorUtils';
+import { CYBERPUNK_COLORS, getGlowColor, IMPORTANCE_COLORS, SOURCE_CREDIBILITY_COLORS, SOURCE_CREDIBILITY_LABELS, VERIFICATION_STATUS_COLORS, VERIFICATION_STATUS_LABELS } from '@/utils/colorUtils';
 import type { Report, ReportExportFormat, ReportTimelineEntry } from '@/types';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -208,6 +208,76 @@ function CaseSummarySection({ report }: { report: Report }) {
         })}
       </div>
 
+      <div className="space-y-1.5">
+        <div className="text-xs font-mono font-bold" style={{ color: CYBERPUNK_COLORS.accentGreen }}>
+          来源可信度分布
+        </div>
+        {(['very_high', 'high', 'medium', 'low', 'very_low'] as const).map((level) => {
+          const count = s.evidenceBySourceCredibility?.[level] ?? 0;
+          if (count === 0) return null;
+          const total = s.totalEvidence || 1;
+          const pct = Math.round((count / total) * 100);
+          return (
+            <div key={level} className="flex items-center gap-2">
+              <span
+                className="text-xs font-mono w-10"
+                style={{ color: SOURCE_CREDIBILITY_COLORS[level] }}
+              >
+                {SOURCE_CREDIBILITY_LABELS[level]}
+              </span>
+              <div className="flex-1 h-2 rounded-full" style={{ backgroundColor: CYBERPUNK_COLORS.bgPrimary }}>
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${pct}%`,
+                    backgroundColor: SOURCE_CREDIBILITY_COLORS[level],
+                    boxShadow: `0 0 4px ${getGlowColor(SOURCE_CREDIBILITY_COLORS[level], 0.5)}`,
+                  }}
+                />
+              </div>
+              <span className="text-xs font-mono w-6 text-right" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+                {count}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="text-xs font-mono font-bold" style={{ color: CYBERPUNK_COLORS.accentPurple }}>
+          核验状态分布
+        </div>
+        {(['verified', 'pending', 'unverified', 'failed', 'disputed'] as const).map((status) => {
+          const count = s.evidenceByVerificationStatus?.[status] ?? 0;
+          if (count === 0) return null;
+          const total = s.totalEvidence || 1;
+          const pct = Math.round((count / total) * 100);
+          return (
+            <div key={status} className="flex items-center gap-2">
+              <span
+                className="text-xs font-mono w-16"
+                style={{ color: VERIFICATION_STATUS_COLORS[status] }}
+              >
+                {VERIFICATION_STATUS_LABELS[status]}
+              </span>
+              <div className="flex-1 h-2 rounded-full" style={{ backgroundColor: CYBERPUNK_COLORS.bgPrimary }}>
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${pct}%`,
+                    backgroundColor: VERIFICATION_STATUS_COLORS[status],
+                    boxShadow: `0 0 4px ${getGlowColor(VERIFICATION_STATUS_COLORS[status], 0.5)}`,
+                  }}
+                />
+              </div>
+              <span className="text-xs font-mono w-6 text-right" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+                {count}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
       {s.collaborators.length > 0 && (
         <div className="space-y-1.5">
           <div className="text-xs font-mono font-bold flex items-center gap-1" style={{ color: CYBERPUNK_COLORS.accentCyan }}>
@@ -298,6 +368,34 @@ function RelationshipGraphSection({ report }: { report: Report }) {
               <div className="px-3 pb-2 space-y-1">
                 <div className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
                   来源: {node.source}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+                    可信度:
+                  </span>
+                  <span
+                    className="text-xs font-mono px-1 rounded-sm"
+                    style={{
+                      color: SOURCE_CREDIBILITY_COLORS[node.sourceCredibility],
+                      backgroundColor: getGlowColor(SOURCE_CREDIBILITY_COLORS[node.sourceCredibility], 0.1),
+                    }}
+                  >
+                    {SOURCE_CREDIBILITY_LABELS[node.sourceCredibility]}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
+                    核验状态:
+                  </span>
+                  <span
+                    className="text-xs font-mono px-1 rounded-sm"
+                    style={{
+                      color: VERIFICATION_STATUS_COLORS[node.verificationStatus],
+                      backgroundColor: getGlowColor(VERIFICATION_STATUS_COLORS[node.verificationStatus], 0.1),
+                    }}
+                  >
+                    {VERIFICATION_STATUS_LABELS[node.verificationStatus]}
+                  </span>
                 </div>
                 <div className="text-xs font-mono" style={{ color: CYBERPUNK_COLORS.textSecondary }}>
                   状态: {STATUS_LABELS[node.status] ?? node.status}

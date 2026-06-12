@@ -11,9 +11,11 @@ import {
   RefreshCw,
   Gauge,
   Clock,
+  Shield,
+  ShieldCheck,
 } from 'lucide-react';
 import { GlowBorder } from '@/components/ui/GlowBorder';
-import { CYBERPUNK_COLORS, getGlowColor, IMPORTANCE_COLORS } from '@/utils/colorUtils';
+import { CYBERPUNK_COLORS, getGlowColor, IMPORTANCE_COLORS, SOURCE_CREDIBILITY_COLORS, SOURCE_CREDIBILITY_LABELS, VERIFICATION_STATUS_COLORS, VERIFICATION_STATUS_LABELS } from '@/utils/colorUtils';
 import { caseApi } from '@/api/caseApi';
 import { useCaseStore } from '@/store/useCaseStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -323,6 +325,132 @@ export const CaseOverviewPanel: React.FC = () => {
                         })}
                       </div>
                     )}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2 space-y-4">
+                  <h3
+                    className="font-mono text-sm uppercase tracking-wider flex items-center gap-2"
+                    style={{ color: CYBERPUNK_COLORS.accentGreen }}
+                  >
+                    <Shield size={16} />
+                    来源可信度分布
+                  </h3>
+                  <div
+                    className="p-4 border rounded-sm space-y-3"
+                    style={{
+                      borderColor: CYBERPUNK_COLORS.borderColor,
+                      backgroundColor: CYBERPUNK_COLORS.bgTertiary,
+                    }}
+                  >
+                    {(['very_high', 'high', 'medium', 'low', 'very_low'] as const).map((level) => {
+                      const count = overview?.evidenceBySourceCredibility[level] ?? 0;
+                      const percentage = totalImportanceCount > 0 ? (count / totalImportanceCount) * 100 : 0;
+                      const color = SOURCE_CREDIBILITY_COLORS[level];
+                      return (
+                        <div key={level}>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-sm"
+                                style={{
+                                  backgroundColor: color,
+                                  boxShadow: `0 0 6px ${getGlowColor(color, 0.6)}`,
+                                }}
+                              />
+                              <span
+                                className="font-mono text-sm"
+                                style={{ color: CYBERPUNK_COLORS.textPrimary }}
+                              >
+                                {SOURCE_CREDIBILITY_LABELS[level]}
+                              </span>
+                            </div>
+                            <span
+                              className="font-mono text-sm"
+                              style={{ color: CYBERPUNK_COLORS.textSecondary }}
+                            >
+                              {count} 条 ({percentage.toFixed(1)}%)
+                            </span>
+                          </div>
+                          <div
+                            className="h-2 rounded-sm overflow-hidden"
+                            style={{ backgroundColor: CYBERPUNK_COLORS.bgSecondary }}
+                          >
+                            <div
+                              className="h-full transition-all duration-500"
+                              style={{
+                                width: `${percentage}%`,
+                                backgroundColor: color,
+                                boxShadow: `0 0 8px ${getGlowColor(color, 0.6)}`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3
+                    className="font-mono text-sm uppercase tracking-wider flex items-center gap-2"
+                    style={{ color: CYBERPUNK_COLORS.accentPurple }}
+                  >
+                    <ShieldCheck size={16} />
+                    核验状态分布
+                  </h3>
+                  <div
+                    className="p-4 border rounded-sm space-y-3"
+                    style={{
+                      borderColor: CYBERPUNK_COLORS.borderColor,
+                      backgroundColor: CYBERPUNK_COLORS.bgTertiary,
+                    }}
+                  >
+                    {(['verified', 'pending', 'unverified', 'failed', 'disputed'] as const).map((status) => {
+                      const count = overview?.evidenceByVerificationStatus[status] ?? 0;
+                      const percentage = totalImportanceCount > 0 ? (count / totalImportanceCount) * 100 : 0;
+                      const color = VERIFICATION_STATUS_COLORS[status];
+                      return (
+                        <div key={status}>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-sm"
+                                style={{
+                                  backgroundColor: color,
+                                  boxShadow: `0 0 6px ${getGlowColor(color, 0.6)}`,
+                                }}
+                              />
+                              <span
+                                className="font-mono text-sm"
+                                style={{ color: CYBERPUNK_COLORS.textPrimary }}
+                              >
+                                {VERIFICATION_STATUS_LABELS[status]}
+                              </span>
+                            </div>
+                            <span
+                              className="font-mono text-sm"
+                              style={{ color: CYBERPUNK_COLORS.textSecondary }}
+                            >
+                              {count} 条 ({percentage.toFixed(1)}%)
+                            </span>
+                          </div>
+                          <div
+                            className="h-2 rounded-sm overflow-hidden"
+                            style={{ backgroundColor: CYBERPUNK_COLORS.bgSecondary }}
+                          >
+                            <div
+                              className="h-full transition-all duration-500"
+                              style={{
+                                width: `${percentage}%`,
+                                backgroundColor: color,
+                                boxShadow: `0 0 8px ${getGlowColor(color, 0.6)}`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

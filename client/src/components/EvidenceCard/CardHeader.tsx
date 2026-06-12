@@ -1,7 +1,7 @@
 import React from 'react';
-import { Tag } from 'lucide-react';
+import { Tag, ShieldCheck } from 'lucide-react';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
-import { CYBERPUNK_COLORS, getGlowColor } from '@/utils/colorUtils';
+import { CYBERPUNK_COLORS, getGlowColor, VERIFICATION_STATUS_COLORS, VERIFICATION_STATUS_LABELS } from '@/utils/colorUtils';
 import type { Evidence } from '@/types';
 
 interface CardHeaderProps {
@@ -10,6 +10,9 @@ interface CardHeaderProps {
 }
 
 export const CardHeader: React.FC<CardHeaderProps> = ({ evidence, zoom }) => {
+  const verificationColor = VERIFICATION_STATUS_COLORS[evidence.verificationStatus];
+  const verificationLabel = VERIFICATION_STATUS_LABELS[evidence.verificationStatus];
+
   return (
     <div
       className="flex items-center justify-between px-2 py-1 border-b"
@@ -54,7 +57,33 @@ export const CardHeader: React.FC<CardHeaderProps> = ({ evidence, zoom }) => {
           )}
         </div>
       </div>
-      <StatusIndicator importance={evidence.importance} size="sm" pulse={true} />
+      <div className="flex items-center gap-1">
+        <div
+          className="flex items-center gap-0.5 px-1 rounded-sm"
+          style={{
+            backgroundColor: getGlowColor(verificationColor, 0.15),
+          }}
+          title={`核验状态: ${verificationLabel}`}
+        >
+          <ShieldCheck
+            size={10 / zoom}
+            style={{
+              color: verificationColor,
+              filter: `drop-shadow(0 0 2px ${getGlowColor(verificationColor, 0.6)})`,
+            }}
+          />
+          <span
+            className="font-mono"
+            style={{
+              fontSize: `${8 / zoom}px`,
+              color: verificationColor,
+            }}
+          >
+            {verificationLabel}
+          </span>
+        </div>
+        <StatusIndicator importance={evidence.importance} size="sm" pulse={true} />
+      </div>
     </div>
   );
 };

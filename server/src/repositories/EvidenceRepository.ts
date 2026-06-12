@@ -7,6 +7,8 @@ interface EvidenceRow {
   case_id: string;
   content: string;
   source: string;
+  source_credibility: string;
+  verification_status: string;
   importance: string;
   tags: string;
   position_x: number;
@@ -28,6 +30,8 @@ const rowToEvidence = (row: EvidenceRow): Evidence => ({
   caseId: row.case_id,
   content: row.content,
   source: row.source,
+  sourceCredibility: row.source_credibility as Evidence['sourceCredibility'],
+  verificationStatus: row.verification_status as Evidence['verificationStatus'],
   importance: row.importance as Evidence['importance'],
   tags: JSON.parse(row.tags) as string[],
   positionX: row.position_x,
@@ -134,16 +138,18 @@ export const EvidenceRepository = {
     const now = new Date().toISOString();
     const stmt = db.prepare(`
       INSERT INTO evidence (
-        id, case_id, content, source, importance, tags,
-        position_x, position_y, width, height, color, timestamp,
+        id, case_id, content, source, source_credibility, verification_status,
+        importance, tags, position_x, position_y, width, height, color, timestamp,
         assigned_to, status, created_at, deleted_at, deleted_by, deleted_by_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
     `);
     stmt.run(
       id,
       dto.caseId,
       dto.content,
       dto.source ?? 'unknown',
+      dto.sourceCredibility ?? 'medium',
+      dto.verificationStatus ?? 'unverified',
       dto.importance ?? 'normal',
       JSON.stringify(dto.tags ?? []),
       dto.positionX ?? 0,
@@ -173,6 +179,14 @@ export const EvidenceRepository = {
     if (dto.source !== undefined) {
       fields.push('source = ?');
       values.push(dto.source);
+    }
+    if (dto.sourceCredibility !== undefined) {
+      fields.push('source_credibility = ?');
+      values.push(dto.sourceCredibility);
+    }
+    if (dto.verificationStatus !== undefined) {
+      fields.push('verification_status = ?');
+      values.push(dto.verificationStatus);
     }
     if (dto.importance !== undefined) {
       fields.push('importance = ?');

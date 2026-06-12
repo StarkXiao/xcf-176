@@ -8,6 +8,8 @@ function makeEvidence(overrides: Partial<Evidence> = {}): Evidence {
     caseId: 'case-1',
     content: '测试证据',
     source: 'manual',
+    sourceCredibility: 'medium',
+    verificationStatus: 'unverified',
     importance: 'high',
     tags: ['标签A'],
     positionX: 0,

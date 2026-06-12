@@ -65,6 +65,8 @@ export function buildTraceGraph(
       label: e.content.length > 30 ? e.content.slice(0, 30) + '...' : e.content,
       timestamp: e.timestamp || e.createdAt,
       importance: e.importance,
+      sourceCredibility: e.sourceCredibility,
+      verificationStatus: e.verificationStatus,
       referenceId: e.id,
       tags: e.tags || [],
     });
@@ -218,6 +220,31 @@ export function filterGraphByPerspective(graph: TraceGraph, perspective: TracePe
         (e) => importanceNodeIds.has(e.fromNodeId) && importanceNodeIds.has(e.toNodeId)
       );
       return { nodes: importanceNodes, edges: importanceEdges };
+    }
+
+    case 'credibility': {
+      const credibilityNodes = graph.nodes.filter(
+        (n) => n.sourceCredibility && n.sourceCredibility !== 'very_low' && n.sourceCredibility !== 'low'
+      );
+      if (credibilityNodes.length === 0) {
+        return { nodes: graph.nodes.filter((n) => n.sourceCredibility), edges: [] };
+      }
+      const credibilityNodeIds = new Set(credibilityNodes.map((n) => n.id));
+      const credibilityEdges = graph.edges.filter(
+        (e) => credibilityNodeIds.has(e.fromNodeId) && credibilityNodeIds.has(e.toNodeId)
+      );
+      return { nodes: credibilityNodes, edges: credibilityEdges };
+    }
+
+    case 'verification': {
+      const verificationNodes = graph.nodes.filter(
+        (n) => n.verificationStatus
+      );
+      const verificationNodeIds = new Set(verificationNodes.map((n) => n.id));
+      const verificationEdges = graph.edges.filter(
+        (e) => verificationNodeIds.has(e.fromNodeId) && verificationNodeIds.has(e.toNodeId)
+      );
+      return { nodes: verificationNodes, edges: verificationEdges };
     }
 
     default:
